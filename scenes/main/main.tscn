@@ -24,8 +24,9 @@ hud = NodePath("Hud")
 
 [node name="CameraRig" parent="." instance=ExtResource("4_camera")]
 
-[node name="InteractionManager" type="Node" parent="." node_paths=PackedStringArray("camera_rig")]
+[node name="InteractionManager" type="Node" parent="." node_paths=PackedStringArray("camera_rig", "rope")]
 script = ExtResource("5_interaction")
 camera_rig = NodePath("../CameraRig")
+rope = NodePath("../Rope")
 
 [node name="Hud" parent="." instance=ExtResource("6_hud")]

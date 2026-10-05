@@ -6,8 +6,8 @@ extends RefCounted
 ##
 ## Pure data and math: no nodes, rendering or input. Positions are in world
 ## space. A particle with zero inverse mass is pinned: the solver never moves
-## it, only pin() does. Attachments and user interaction are expressed as pins,
-## so the user never edits the rope directly; they constrain it.
+## it, only pin() does. User grabs are separate soft positional constraints,
+## keeping particles movable so length and contact constraints can respond.
 
 var _config: RopeConfig
 var _positions := PackedVector3Array()
@@ -16,6 +16,9 @@ var _inverse_mass := PackedFloat32Array()
 var _lambdas := PackedFloat32Array()
 var _last_substep := 0.0
 var _collision: RopeCollision
+var _drag_index := -1
+var _drag_target := Vector3.ZERO
+var _drag_lambda := Vector3.ZERO
 
 
 func _init(config: RopeConfig, initial_positions: PackedVector3Array) -> void:
@@ -41,7 +44,9 @@ func step(dt: float) -> void:
 	for substep in _config.substeps:
 		_integrate(h)
 		_lambdas.fill(0.0)
+		_drag_lambda = Vector3.ZERO
 		for iteration in _config.solver_iterations:
+			_solve_drag(h)
 			# Alternating sweep direction avoids a bias toward one end.
 			_solve_distances(alpha, sweep % 2 == 1)
 			if _collision != null:
@@ -53,6 +58,56 @@ func step(dt: float) -> void:
 
 func set_collision(collision: RopeCollision) -> void:
 	_collision = collision
+
+
+func begin_drag(index: int) -> bool:
+	if index < 0 or index >= _positions.size() or is_pinned(index):
+		return false
+	_drag_index = index
+	_drag_target = _positions[index]
+	return true
+
+
+func update_drag_target(target: Vector3) -> void:
+	if _drag_index < 0 or not target.is_finite():
+		return
+	# Intersect reachable spheres around attachments; extra path around the
+	# mannequin is still handled by the soft constraint rather than stretching.
+	for pass_index in 8:
+		for i in _positions.size():
+			if is_pinned(i):
+				var reach := absf(float(i - _drag_index)) * _config.get_rest_length()
+				target = _positions[i] + (target - _positions[i]).limit_length(reach)
+	_drag_target = target
+
+
+func end_drag() -> void:
+	_drag_index = -1
+	_drag_lambda = Vector3.ZERO
+
+
+func get_drag_index() -> int:
+	return _drag_index
+
+
+func get_drag_target() -> Vector3:
+	return _drag_target
+
+
+func stop_motion() -> void:
+	_previous = _positions.duplicate()
+	_last_substep = 0.0
+
+
+func _solve_drag(dt: float) -> void:
+	if _drag_index < 0:
+		return
+	var alpha := _config.drag_compliance / (dt * dt)
+	var current := _positions[_drag_index]
+	var correction := (_drag_target - current - _drag_lambda * alpha) / (1.0 + alpha)
+	correction = correction.limit_length(_config.drag_speed * dt)
+	_drag_lambda += correction
+	_positions[_drag_index] = current + correction
 
 
 ## Pins a particle at a world position. Moving a pinned particle is how

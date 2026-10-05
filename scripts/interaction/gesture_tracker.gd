@@ -10,7 +10,10 @@ extends RefCounted
 ## Pure input logic without scene access: unit-testable, and reusable when the
 ## InteractionManager starts routing primary drags to the rope.
 
+signal primary_started(position: Vector2)
 signal primary_drag(position: Vector2, relative: Vector2)
+signal primary_ended
+signal primary_cancelled
 signal secondary_drag(relative: Vector2)
 signal zoom(factor: float)
 
@@ -22,6 +25,7 @@ const MIN_PINCH_SPREAD := 1.0
 
 var _pointers: Dictionary[int, Vector2] = {}
 var _mouse_secondary_held := false
+var _primary_active := false
 
 
 ## Returns true when the event was consumed as part of a gesture.
@@ -44,6 +48,7 @@ func handle(event: InputEvent) -> bool:
 
 
 func reset() -> void:
+	_cancel_primary()
 	_pointers.clear()
 	_mouse_secondary_held = false
 
@@ -52,21 +57,46 @@ func get_pointer_count() -> int:
 	return _pointers.size()
 
 
+## Releases must be observed before UI handling, even outside the scene area.
+func is_captured_release(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch:
+		return (not event.pressed or event.canceled) and _pointers.has(event.index)
+	if event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and not event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			return _pointers.has(MOUSE_POINTER)
+		return _mouse_secondary_held and event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]
+	return false
+
+
+func is_captured_motion(event: InputEvent) -> bool:
+	if event is InputEventScreenDrag:
+		return _pointers.has(event.index)
+	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION:
+		return _pointers.has(MOUSE_POINTER) or _mouse_secondary_held
+	return false
+
+
 func _handle_touch(event: InputEventScreenTouch) -> bool:
-	if event.pressed:
-		_pointers[event.index] = event.position
+	if event.canceled:
+		if not _pointers.has(event.index):
+			return false
+		_cancel_primary()
+		_pointers.erase(event.index)
 		return true
-	return _pointers.erase(event.index)
+	if event.pressed:
+		return _press_pointer(event.index, event.position)
+	return _release_pointer(event.index)
 
 
 func _handle_mouse_button(event: InputEventMouseButton) -> bool:
 	match event.button_index:
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				_pointers[MOUSE_POINTER] = event.position
-				return true
-			return _pointers.erase(MOUSE_POINTER)
+				return _press_pointer(MOUSE_POINTER, event.position)
+			return _release_pointer(MOUSE_POINTER)
 		MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
+			if event.pressed:
+				_cancel_primary()
 			_mouse_secondary_held = event.pressed
 			return true
 		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
@@ -79,12 +109,42 @@ func _handle_mouse_button(event: InputEventMouseButton) -> bool:
 
 
 func _handle_mouse_motion(event: InputEventMouseMotion) -> bool:
-	if _pointers.has(MOUSE_POINTER):
-		return _move_pointer(MOUSE_POINTER, event.position)
 	if _mouse_secondary_held:
+		if _pointers.has(MOUSE_POINTER):
+			_pointers[MOUSE_POINTER] = event.position
 		secondary_drag.emit(event.relative)
 		return true
+	if _pointers.has(MOUSE_POINTER):
+		return _move_pointer(MOUSE_POINTER, event.position)
 	return false
+
+
+func _press_pointer(index: int, position: Vector2) -> bool:
+	if _pointers.has(index):
+		return true
+	var first := _pointers.is_empty() and not _mouse_secondary_held
+	_pointers[index] = position
+	if first:
+		_primary_active = true
+		primary_started.emit(position)
+	else:
+		_cancel_primary()
+	return true
+
+
+func _release_pointer(index: int) -> bool:
+	if not _pointers.erase(index):
+		return false
+	if _primary_active:
+		_primary_active = false
+		primary_ended.emit()
+	return true
+
+
+func _cancel_primary() -> void:
+	if _primary_active:
+		_primary_active = false
+		primary_cancelled.emit()
 
 
 func _move_pointer(index: int, position: Vector2) -> bool:

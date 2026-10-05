@@ -6,7 +6,7 @@ Godot 4.7.2 / GDScript prototype, targeting iOS first. Open `project.godot`
 in Godot and run the main scene (F6 from `scenes/main/main.tscn`, or F5).
 No third-party dependencies are required.
 
-## Current milestone: rope simulation and mannequin collision
+## Current milestone: touch and mouse rope interaction
 
 - Abstract mannequin and studio lighting.
 - One procedural tube mesh with rounded ends, suspended between two anchors.
@@ -16,10 +16,13 @@ No third-party dependencies are required.
   including rope segment interiors, floor contact and friction.
 - Camera orbit, zoom and pan; Reset restores the camera, mannequin pose and
   rope simulation for the fixed-anchor scene.
+- Grab visible rope segments with a finger or mouse. A soft positional
+  constraint responds to the pointer while respecting attachments and contacts.
+  Release holds the current shape; grabbing again resumes simulation.
 
-Touch: one finger orbits; two fingers pan and pinch to zoom.
-Mouse: left-drag orbits, right/middle-drag pans, wheel zooms.
-Rope dragging is the next milestone.
+Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
+and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
+pans, wheel zooms. The two dark attachment endpoints stay fixed.
 
 ## Module boundaries
 
@@ -31,6 +34,7 @@ Rope dragging is the next milestone.
 | `scripts/rope/rope_collision.gd` | Primitive contacts, segment projection and bounded motion sweeps |
 | `scripts/rope/rope_renderer.gd` | Centerline to a single tube mesh |
 | `scripts/rope/rope.gd` | Fixed-step scheduling, anchors and renderer wiring |
+| `scripts/interaction/rope_interaction.gd` | Visible-segment picking, grab plane and solver intent |
 | `scripts/core/app_controller.gd` | Scene wiring and Reset |
 | `scripts/interaction/`, `scripts/camera/` | Input gestures and camera intent |
 | `scripts/mannequin/`, `data/mannequin/` | Figure geometry and matching primitive collision shapes |
@@ -47,6 +51,7 @@ Run from the project directory, substituting your Godot executable:
 godot --headless --path . --import
 godot --headless --path . -s res://tests/run_tests.gd
 godot --path . -s res://tools/capture_screenshot.gd -- <absolute-output.png> 180
+godot --path . -s res://tools/verify_interaction.gd -- <output-directory>
 ```
 
 The screenshot command requires a graphics driver and an existing output
@@ -54,9 +59,12 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 35 tests passed. A rendered scene smoke check exercised camera orbit,
+All 47 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
-This checks scene integration, not physical touchscreen input.
+The rendered interaction smoke additionally sends mouse input through Godot's
+input dispatch, drags the rope, releases over the HUD and clicks Reset.
+This checks scene integration, not physical touchscreen input. Tests cover
+two-finger transitions, cancellation, focus loss and occluded picking.
 
 ## Remaining validation and next milestone
 
@@ -64,8 +72,8 @@ This checks scene integration, not physical touchscreen input.
   sweeps are bounded; rope self-collision and arbitrary-speed continuous
   collision detection are not implemented. Default mannequin contact tests
   check segment clearance, length, settling and friction.
-- Add segment picking and temporary drag constraints in `RopeInteraction`.
-  Define anchor removal and anchor Reset semantics at that stage: currently
+- The current attachments stay fixed. Before making them movable, define
+  anchor removal and anchor Reset semantics: currently
   removing an anchor reference alone does not release its pin, and Reset
   rebuilds from current anchor positions.
 - Profile both solver and renderer on iPad. The renderer currently recreates

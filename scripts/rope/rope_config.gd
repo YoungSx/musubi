@@ -7,6 +7,9 @@ extends Resource
 @export_range(2, 256, 1) var segment_count: int = 48
 @export_range(0.002, 0.05, 0.001, "suffix:m") var radius: float = 0.012
 @export var gravity: Vector3 = Vector3(0.0, -9.8, 0.0)
+## A soft grab yields to rope length and collision constraints.
+@export_range(0.00001, 0.01, 0.00001) var drag_compliance: float = 0.001
+@export_range(0.1, 5.0, 0.1, "suffix:m/s") var drag_speed: float = 1.5
 ## Exponential velocity decay rate per second. 0 keeps all momentum.
 @export_range(0.0, 20.0, 0.01) var damping: float = 0.8
 ## XPBD compliance of the distance constraints (inverse stiffness).

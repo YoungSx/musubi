@@ -15,6 +15,7 @@ extends Node3D
 var _simulation: RopeSimulation
 var _collision: RopeCollision
 var _accumulator := 0.0
+var _held := false
 
 @onready var _renderer: RopeRenderer = $RopeRenderer
 
@@ -32,6 +33,8 @@ func _process(delta: float) -> void:
 ## Advances the simulation by wall-clock time using fixed steps. Returns the
 ## number of steps taken.
 func advance(delta: float) -> int:
+	if _held:
+		return 0
 	var dt := config.get_time_step()
 	_accumulator += delta
 	var steps := 0
@@ -53,6 +56,7 @@ func reset() -> void:
 	_simulation = RopeSimulation.new(config, points)
 	_simulation.set_collision(_collision)
 	_accumulator = 0.0
+	_held = false
 	_sync_anchors()
 	_renderer.update_mesh(_simulation.get_positions(), config.radius)
 
@@ -69,6 +73,34 @@ func set_collision(collision: RopeCollision) -> void:
 
 func get_collision() -> RopeCollision:
 	return _collision
+
+
+## Input changes solver intent only. Release holds the whole shape, allowing
+## the user to orbit, inspect and grab again without losing their arrangement.
+func begin_drag(index: int) -> bool:
+	if not _simulation.begin_drag(index):
+		return false
+	_held = false
+	_accumulator = 0.0
+	return true
+
+
+func update_drag_target(target: Vector3) -> void:
+	_simulation.update_drag_target(target)
+
+
+func end_drag() -> void:
+	if _simulation.get_drag_index() < 0:
+		return
+	_simulation.end_drag()
+	_simulation.stop_motion()
+	_held = true
+	_accumulator = 0.0
+	_renderer.update_mesh(_simulation.get_positions(), config.radius)
+
+
+func is_held() -> bool:
+	return _held
 
 
 func _sync_anchors() -> void:
