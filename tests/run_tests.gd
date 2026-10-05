@@ -22,6 +22,10 @@ const TEST_SCRIPTS: Array[String] = [
 
 
 func _initialize() -> void:
+	# Headless windows otherwise default to 100×100 when desktop stretch is off.
+	root.size = Vector2i(1280, 800)
+	root.content_scale_size = Vector2i(1280, 800)
+	root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	_run.call_deferred()
 
 

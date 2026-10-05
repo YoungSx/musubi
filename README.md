@@ -2,7 +2,8 @@
 
 An interactive study of rope, form and connection.
 
-Godot 4.7.2 / GDScript prototype, targeting iOS first. Open `project.godot`
+Godot 4.7.2 / GDScript prototype, validating Windows locally first while keeping
+the simulation and touch input portable. Open `project.godot`
 in Godot and run the main scene (F6 from `scenes/main/main.tscn`, or F5).
 No third-party dependencies are required.
 
@@ -45,7 +46,8 @@ pans, wheel zooms. The two dark attachment endpoints stay fixed.
 
 The default rope uses 48 segments, a 1.4 m rest length, 120 Hz simulation,
 6 substeps and 2 constraint iterations per substep. Catch-up is bounded after
-frame hitches. The default camera preset frames both endpoints in portrait.
+frame hitches. The desktop window starts at 1280×800, resizes down to 960×640
+and adapts UI scale to display DPI. Mobile retains its portrait viewport.
 
 ## Verification
 

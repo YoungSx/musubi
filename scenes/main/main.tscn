@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="6_hud"]
 [ext_resource type="PackedScene" path="res://scenes/rope/rope.tscn" id="7_rope"]
 [ext_resource type="Script" path="res://scripts/debug/rope_debug.gd" id="8_debug"]
+[ext_resource type="Script" path="res://scripts/core/desktop_window.gd" id="9_window"]
 
 [node name="Main" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "interaction_manager", "hud", "rope_debug")]
 script = ExtResource("1_app")
@@ -35,3 +36,6 @@ rope = NodePath("../Rope")
 
 [node name="RopeDebug" type="Node3D" parent="."]
 script = ExtResource("8_debug")
+
+[node name="DesktopWindow" type="Node" parent="."]
+script = ExtResource("9_window")

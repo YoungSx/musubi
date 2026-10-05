@@ -37,6 +37,10 @@ func _apply_safe_area() -> void:
 	var window_size := Vector2(DisplayServer.window_get_size())
 	if window_size.x <= 0.0 or window_size.y <= 0.0:
 		return
+	if OS.has_feature("pc"):
+		for side: StringName in _base_margins:
+			_safe_area.add_theme_constant_override(side, _base_margins[side])
+		return
 	var safe := Rect2(DisplayServer.get_display_safe_area())
 	var window_rect := Rect2(Vector2(DisplayServer.window_get_position()), window_size)
 	safe = safe.intersection(window_rect)

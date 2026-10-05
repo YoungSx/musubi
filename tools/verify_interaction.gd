@@ -34,8 +34,8 @@ func _run() -> void:
 	var before := app.rope.get_simulation().get_point(index)
 	for step in 30:
 		var motion := InputEventMouseMotion.new()
-		motion.position = position + Vector2(-55, -65) * float(step + 1) / 30.0
-		motion.relative = Vector2(-55, -65) / 30.0
+		motion.position = root.get_final_transform() * (position + Vector2(-55, -65) * float(step + 1) / 30.0)
+		motion.relative = root.get_final_transform().basis_xform(Vector2(-55, -65) / 30.0)
 		motion.button_mask = MOUSE_BUTTON_MASK_LEFT
 		Input.parse_input_event(motion)
 		await _frames(2)
@@ -72,7 +72,8 @@ func _run() -> void:
 
 func _button(position: Vector2, pressed: bool) -> void:
 	var event := InputEventMouseButton.new()
-	event.position = position
+	# Input.parse_input_event takes window pixels, including native DPI scaling.
+	event.position = root.get_final_transform() * position
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = pressed
 	Input.parse_input_event(event)
