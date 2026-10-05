@@ -7,7 +7,11 @@ weights. Pins remain exact. Relative normal motion is removed on impact; bounded
 tangential friction reduces sliding without damping free flight.
 
 The approach follows [position-based contact constraints](https://matthias-research.github.io/pages/publications/posBasedDyn.pdf).
-Closest segment points use [Godot Geometry3D](https://docs.godotengine.org/en/4.4/classes/class_geometry3d.html).
+Closest segment points use `RopeGeometry` with a relative determinant threshold.
+[Godot 4.7.2's built-in implementation](https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/core/math/geometry_3d.cpp)
+uses an absolute determinant threshold, which misclassifies centimeter-scale
+perpendicular segments as parallel. Analytical multi-scale regression tests
+cover the replacement independently of the simulation's clearance checks.
 
 Swept AABBs and an X-axis sweep-and-prune pass reject separated pairs. For motion
 larger than a quarter diameter, up to 16 conservative-advancement steps search
@@ -26,19 +30,32 @@ their existing outer schema.
 
 ## Validation
 
-- 78 tests pass, including segment-interior crossings, exact pins, equal-mass
+- 82 tests pass, including segment-interior crossings, exact pins, equal-mass
   response, fast crossings with separated final states, degenerate contacts,
   neighbor exclusion, friction, JSON continuation with active contact, and
   legacy full-scene load/Reset.
 - `tools/verify_self_collision.gd` simulates a 48-segment open figure-eight,
   drags and releases it, checks clearance/length and writes rendered screenshots.
-  Over 360 steps: minimum separation after settling **0.040020 m** for a **0.04 m**
-  diameter; maximum segment stretch **0.58%**.
+  Over 360 steps: minimum separation after settling **0.040852 m** for a **0.04 m**
+  diameter; maximum segment stretch **0.59%**.
 - Same-process default mannequin benchmark, 60 warmup and 240 measured steps:
-  self-contact off median **3.444 ms**, on median **5.062 ms** per 120 Hz step.
-  On p95 **5.490 ms**. Windows/Godot 4.7.2; desktop results, not mobile acceptance.
+  self-contact off median **3.522 ms**, on median **5.457 ms** per 120 Hz step.
+  On p95 **6.137 ms**. Windows/Godot 4.7.2; desktop results, not mobile acceptance.
 - Rendered normal-scene input checks cover drag, endpoint/depth controls,
   cancellation, Reset, Save/Open and performance export.
+- `tools/verify_tightening.gd`: 72-segment open trefoil, one fixed end and one
+  dragged through a 2.6 m target displacement, then released; 600 steps.
+  Minimum centerline separation **0.023530 m** for **0.024 m** diameter, maximum
+  segment stretch **2.05%**. Rendered checkpoint separation exceeds **0.02405 m**.
+- `tools/verify_wrap.gd`: 48-segment wrap around the actual mannequin, dragging
+  and release under gravity for 600 steps. Minimum sampled obstacle clearance
+  **0.012050 m** for **0.012 m** radius; self separation **0.024020 m**;
+  maximum stretch **0.089%**. Obstacle clearance samples five points per segment,
+  so this is a regression scenario rather than an exact continuous-space proof.
+
+These measurements supersede the earlier builtin-Geometry3D clearance results.
+Run either tool with an existing output directory after `--` to capture images.
+The stress tools are development fixtures, not user-facing knot presets.
 
 ## Limits
 
@@ -47,6 +64,7 @@ Dense contacts, impossible fixed attachments, initial overlaps and sufficiently
 large deformations can leave penetration. Newly created contact pairs outside
 cached bounds are handled on the next iteration; obstacle and self-contact
 constraints can compete. Broad-phase worst case remains quadratic for dense coils.
-The rendered Catmull-Rom tube can deviate slightly from the piecewise-linear
-collision centerline. No knot recognition, twisting model or calibrated static
+Rendered cubic smoothing is limited to 2.5% of rope radius from the piecewise-linear
+collision centerline to prevent smoothing from cutting across a tight contact.
+No knot recognition, twisting model or calibrated static
 knot friction is included. Mobile performance remains unverified.

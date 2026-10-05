@@ -14,6 +14,7 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_rope_simulation.gd",
 	"res://tests/unit/test_rope_renderer.gd",
 	"res://tests/unit/test_rope_collision.gd",
+	"res://tests/unit/test_rope_geometry.gd",
 	"res://tests/unit/test_rope_self_collision.gd",
 	"res://tests/unit/test_rope_drag.gd",
 	"res://tests/unit/test_rope_interaction.gd",

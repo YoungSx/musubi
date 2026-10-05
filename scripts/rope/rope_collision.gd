@@ -62,7 +62,7 @@ class Collider:
 			t = clampf((transform.origin - a).dot(delta) / delta.length_squared(), 0.0, 1.0)
 		elif primitive == MannequinPart.Primitive.CAPSULE:
 			var axis := transform.basis.y * half_axis
-			var pair := Geometry3D.get_closest_points_between_segments(a, b, transform.origin - axis, transform.origin + axis)
+			var pair := RopeGeometry.closest_segment_points(a, b, transform.origin - axis, transform.origin + axis)
 			t = clampf((pair[0] - a).dot(delta) / delta.length_squared(), 0.0, 1.0)
 		else:
 			# The box signed distance is convex along a segment. A bounded search

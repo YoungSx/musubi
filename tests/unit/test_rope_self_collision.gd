@@ -12,6 +12,16 @@ func test_segment_interiors_separate_with_endpoints_far_apart() -> void:
 	assert_true(points[2] == Vector3(2, 2, 2), "unrelated fixed point preserved")
 
 
+func test_centimeter_crossing_resolves_true_interior_contact() -> void:
+	var points := _crossing(0.1)
+	for i in points.size():
+		points[i] *= 0.01
+	var previous := points.duplicate()
+	RopeSelfCollision.new().solve(points, previous, PackedFloat32Array([0, 0, 0, 1, 1]), points.duplicate(), 0.002, 0.01, 0.0)
+	# Independent analytic oracle for perpendicular strands at their midpoints.
+	assert_true((points[3].z + points[4].z) * 0.5 >= 0.004, "centimeter-scale interior contact separates by diameter")
+
+
 func test_pins_and_symmetric_response() -> void:
 	var points := _crossing(0.01)
 	var original := points.duplicate()

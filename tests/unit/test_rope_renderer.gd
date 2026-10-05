@@ -78,3 +78,26 @@ func test_radial_segments_can_change_after_circle_cache_is_built() -> void:
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	assert_eq(vertices.size(), (4 * renderer.subdivisions + 1 + renderer.cap_rings * 2) * 17, "cache follows radial count")
 	assert_near(renderer.mesh.get_aabb().size.y, 0.04, "updated ring has same diameter", 1e-3)
+
+
+func test_tightened_strands_keep_rendered_clearance() -> void:
+	var points := SelfCollisionFixture.trefoil()
+	var config := RopeConfig.new()
+	config.segment_count = points.size() - 1
+	config.length = RopeLayout.polyline_length(points)
+	config.gravity = Vector3.ZERO
+	config.damping = 6.0
+	var simulation := RopeSimulation.new(config, points)
+	simulation.pin(0, points[0])
+	simulation.begin_drag(config.segment_count)
+	for step in 600:
+		if step < 360:
+			simulation.update_drag_target(points[-1] + Vector3(1.5, -2.0, 0.75) * float(step + 1) / 360.0)
+		elif step == 360:
+			simulation.end_drag()
+		simulation.step(config.get_time_step())
+		assert_true(simulation.get_max_segment_stretch() < 0.08, "tightening keeps bounded length")
+	var renderer := add_to_tree(RopeRenderer.new()) as RopeRenderer
+	renderer.update_mesh(simulation.get_positions(), config.radius)
+	var gap := SelfCollisionFixture.rendered_clearance(renderer._centers, config, renderer.subdivisions)
+	assert_true(gap >= config.radius * 1.9, "smoothing preserves contact clearance; gap=%f" % gap)

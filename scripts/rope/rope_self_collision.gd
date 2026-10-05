@@ -57,7 +57,7 @@ func _solve_pair(p: PackedVector3Array, previous: PackedVector3Array, mass: Pack
 	var b := p[i + 1]
 	var c := p[j]
 	var d := p[j + 1]
-	var pair := Geometry3D.get_closest_points_between_segments(a, b, c, d)
+	var pair := RopeGeometry.closest_segment_points(a, b, c, d)
 	var delta := pair[0] - pair[1]
 	var s := _parameter(pair[0], a, b)
 	var t := _parameter(pair[1], c, d)
@@ -71,7 +71,7 @@ func _solve_pair(p: PackedVector3Array, previous: PackedVector3Array, mass: Pack
 			var sb := start[i + 1].lerp(b, time)
 			var sc := start[j].lerp(c, time)
 			var sd := start[j + 1].lerp(d, time)
-			var swept := Geometry3D.get_closest_points_between_segments(sa, sb, sc, sd)
+			var swept := RopeGeometry.closest_segment_points(sa, sb, sc, sd)
 			var separation := swept[0] - swept[1]
 			var gap := separation.length() - diameter
 			if gap <= SKIN:

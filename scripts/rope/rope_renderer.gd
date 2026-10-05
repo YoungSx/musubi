@@ -40,7 +40,7 @@ func update_mesh(points: PackedVector3Array, radius: float) -> void:
 	if points.size() < 2 or radius <= 0.0:
 		_mesh.clear_surfaces()
 		return
-	_sample_centerline(points)
+	_sample_centerline(points, radius)
 	_build_frames()
 	_build_vertices(radius)
 	var ring_count := _centers.size() + cap_rings * 2
@@ -57,7 +57,7 @@ func update_mesh(points: PackedVector3Array, radius: float) -> void:
 	_surface.fill(null)
 
 
-func _sample_centerline(points: PackedVector3Array) -> void:
+func _sample_centerline(points: PackedVector3Array, radius: float) -> void:
 	var last := points.size() - 1
 	_centers.resize(last * subdivisions + 1)
 	for i in last:
@@ -67,7 +67,13 @@ func _sample_centerline(points: PackedVector3Array) -> void:
 		var before := points[i - 1] if i > 0 else p0 * 2.0 - p1
 		var after := points[i + 2] if i + 2 <= last else p1 * 2.0 - p0
 		for s in subdivisions:
-			_centers[i * subdivisions + s] = p0.cubic_interpolate(p1, before, after, float(s) / float(subdivisions))
+			var t := float(s) / float(subdivisions)
+			var linear := p0.lerp(p1, t)
+			var smooth := p0.cubic_interpolate(p1, before, after, t)
+			# Unbounded cubic overshoot cuts through nearby strands of a tight knot
+			# even when the solver's polyline has valid clearance. Keep cosmetic
+			# smoothing within 2.5% of radius of the collision centerline.
+			_centers[i * subdivisions + s] = linear + (smooth - linear).limit_length(radius * 0.025)
 	_centers[_centers.size() - 1] = points[last]
 
 

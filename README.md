@@ -78,6 +78,8 @@ godot --headless --path . -s res://tests/run_tests.gd
 godot --path . -s res://tools/capture_screenshot.gd -- <absolute-output.png> 180
 godot --path . -s res://tools/verify_interaction.gd -- <output-directory>
 godot --path . -s res://tools/verify_self_collision.gd -- <output-directory>
+godot --path . -s res://tools/verify_tightening.gd -- <output-directory>
+godot --path . -s res://tools/verify_wrap.gd -- <output-directory>
 ```
 
 The screenshot command requires a graphics driver and an existing output
@@ -85,7 +87,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 78 tests passed. A rendered scene smoke check exercised camera orbit,
+All 82 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
