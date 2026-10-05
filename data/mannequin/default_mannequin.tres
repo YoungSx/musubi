@@ -1,0 +1,139 @@
+[gd_resource type="Resource" script_class="MannequinConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/mannequin/mannequin_config.gd" id="1_config"]
+[ext_resource type="Script" path="res://scripts/mannequin/mannequin_part.gd" id="2_part"]
+
+[sub_resource type="Resource" id="Resource_head"]
+script = ExtResource("2_part")
+part_name = &"head"
+primitive = 0
+radius = 0.105
+position = Vector3(0, 1.63, 0)
+
+[sub_resource type="Resource" id="Resource_neck"]
+script = ExtResource("2_part")
+part_name = &"neck"
+radius = 0.045
+height = 0.16
+position = Vector3(0, 1.48, 0)
+
+[sub_resource type="Resource" id="Resource_shoulders"]
+script = ExtResource("2_part")
+part_name = &"shoulders"
+radius = 0.07
+height = 0.46
+position = Vector3(0, 1.39, 0)
+rotation_degrees = Vector3(0, 0, 90)
+
+[sub_resource type="Resource" id="Resource_chest"]
+script = ExtResource("2_part")
+part_name = &"chest"
+radius = 0.15
+height = 0.44
+position = Vector3(0, 1.22, 0)
+
+[sub_resource type="Resource" id="Resource_pelvis"]
+script = ExtResource("2_part")
+part_name = &"pelvis"
+radius = 0.12
+height = 0.34
+position = Vector3(0, 0.95, 0)
+rotation_degrees = Vector3(0, 0, 90)
+
+[sub_resource type="Resource" id="Resource_upper_arm_l"]
+script = ExtResource("2_part")
+part_name = &"upper_arm_l"
+radius = 0.05
+height = 0.35
+position = Vector3(0.241, 1.243, 0)
+rotation_degrees = Vector3(0, 0, 12)
+
+[sub_resource type="Resource" id="Resource_forearm_l"]
+script = ExtResource("2_part")
+part_name = &"forearm_l"
+radius = 0.042
+height = 0.31
+position = Vector3(0.291, 0.963, 0)
+rotation_degrees = Vector3(0, 0, 8)
+
+[sub_resource type="Resource" id="Resource_hand_l"]
+script = ExtResource("2_part")
+part_name = &"hand_l"
+radius = 0.042
+height = 0.17
+position = Vector3(0.32, 0.756, 0)
+rotation_degrees = Vector3(0, 0, 8)
+
+[sub_resource type="Resource" id="Resource_upper_arm_r"]
+script = ExtResource("2_part")
+part_name = &"upper_arm_r"
+radius = 0.05
+height = 0.35
+position = Vector3(-0.241, 1.243, 0)
+rotation_degrees = Vector3(0, 0, -12)
+
+[sub_resource type="Resource" id="Resource_forearm_r"]
+script = ExtResource("2_part")
+part_name = &"forearm_r"
+radius = 0.042
+height = 0.31
+position = Vector3(-0.291, 0.963, 0)
+rotation_degrees = Vector3(0, 0, -8)
+
+[sub_resource type="Resource" id="Resource_hand_r"]
+script = ExtResource("2_part")
+part_name = &"hand_r"
+radius = 0.042
+height = 0.17
+position = Vector3(-0.32, 0.756, 0)
+rotation_degrees = Vector3(0, 0, -8)
+
+[sub_resource type="Resource" id="Resource_thigh_l"]
+script = ExtResource("2_part")
+part_name = &"thigh_l"
+radius = 0.075
+height = 0.495
+position = Vector3(0.111, 0.69, 0)
+rotation_degrees = Vector3(0, 0, 3)
+
+[sub_resource type="Resource" id="Resource_calf_l"]
+script = ExtResource("2_part")
+part_name = &"calf_l"
+radius = 0.055
+height = 0.455
+position = Vector3(0.122, 0.281, 0)
+
+[sub_resource type="Resource" id="Resource_foot_l"]
+script = ExtResource("2_part")
+part_name = &"foot_l"
+radius = 0.042
+height = 0.25
+position = Vector3(0.122, 0.042, 0.05)
+rotation_degrees = Vector3(90, 0, 0)
+
+[sub_resource type="Resource" id="Resource_thigh_r"]
+script = ExtResource("2_part")
+part_name = &"thigh_r"
+radius = 0.075
+height = 0.495
+position = Vector3(-0.111, 0.69, 0)
+rotation_degrees = Vector3(0, 0, -3)
+
+[sub_resource type="Resource" id="Resource_calf_r"]
+script = ExtResource("2_part")
+part_name = &"calf_r"
+radius = 0.055
+height = 0.455
+position = Vector3(-0.122, 0.281, 0)
+
+[sub_resource type="Resource" id="Resource_foot_r"]
+script = ExtResource("2_part")
+part_name = &"foot_r"
+radius = 0.042
+height = 0.25
+position = Vector3(-0.122, 0.042, 0.05)
+rotation_degrees = Vector3(90, 0, 0)
+
+[resource]
+script = ExtResource("1_config")
+parts = Array[ExtResource("2_part")]([SubResource("Resource_head"), SubResource("Resource_neck"), SubResource("Resource_shoulders"), SubResource("Resource_chest"), SubResource("Resource_pelvis"), SubResource("Resource_upper_arm_l"), SubResource("Resource_forearm_l"), SubResource("Resource_hand_l"), SubResource("Resource_upper_arm_r"), SubResource("Resource_forearm_r"), SubResource("Resource_hand_r"), SubResource("Resource_thigh_l"), SubResource("Resource_calf_l"), SubResource("Resource_foot_l"), SubResource("Resource_thigh_r"), SubResource("Resource_calf_r"), SubResource("Resource_foot_r")])

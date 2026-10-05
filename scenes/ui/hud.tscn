@@ -1,0 +1,48 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_script"]
+
+[node name="Hud" type="CanvasLayer"]
+script = ExtResource("1_script")
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 36
+
+[node name="Layout" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="SafeArea/Layout"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+text = "Musubi"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="SafeArea/Layout"]
+layout_mode = 2
+theme_type_variation = &"SubtitleLabel"
+text = "rope · form · connection"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="SafeArea/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="ResetButton" type="Button" parent="SafeArea/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+text = "Reset"

@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[ext_resource type="Environment" path="res://assets/environments/studio_environment.tres" id="1_env"]
+[ext_resource type="Material" path="res://assets/materials/floor.tres" id="2_floor"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_floor"]
+top_radius = 12.0
+bottom_radius = 12.0
+height = 0.02
+radial_segments = 96
+rings = 1
+
+[node name="Studio" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.819152, -0.439385, 0.368688, 0, 0.642788, 0.766044, -0.573576, -0.627507, 0.526541, 0, 3, 0)
+light_color = Color(1, 0.96, 0.9, 1)
+light_energy = 1.1
+shadow_enabled = true
+shadow_blur = 2.0
+directional_shadow_mode = 0
+directional_shadow_max_distance = 12.0
+
+[node name="FillLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.707107, 0.183013, -0.683013, 0, 0.965926, 0.258819, 0.707107, 0.183013, -0.683013, 0, 3, 0)
+light_color = Color(0.75, 0.8, 0.95, 1)
+light_energy = 0.35
+light_specular = 0.2
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.01, 0)
+mesh = SubResource("CylinderMesh_floor")
+surface_material_override/0 = ExtResource("2_floor")

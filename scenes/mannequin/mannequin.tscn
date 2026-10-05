@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/mannequin/mannequin.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/mannequin/default_mannequin.tres" id="2_config"]
+[ext_resource type="Material" path="res://assets/materials/mannequin.tres" id="3_material"]
+
+[node name="Mannequin" type="Node3D"]
+script = ExtResource("1_script")
+config = ExtResource("2_config")
+material = ExtResource("3_material")

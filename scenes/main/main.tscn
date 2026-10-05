@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/core/app_controller.gd" id="1_app"]
+[ext_resource type="PackedScene" path="res://scenes/environment/studio.tscn" id="2_studio"]
+[ext_resource type="PackedScene" path="res://scenes/mannequin/mannequin.tscn" id="3_mannequin"]
+[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/interaction/interaction_manager.gd" id="5_interaction"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="6_hud"]
+
+[node name="Main" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "interaction_manager", "hud")]
+script = ExtResource("1_app")
+camera_rig = NodePath("CameraRig")
+mannequin = NodePath("Mannequin")
+interaction_manager = NodePath("InteractionManager")
+hud = NodePath("Hud")
+
+[node name="Studio" parent="." instance=ExtResource("2_studio")]
+
+[node name="Mannequin" parent="." instance=ExtResource("3_mannequin")]
+
+[node name="CameraRig" parent="." instance=ExtResource("4_camera")]
+
+[node name="InteractionManager" type="Node" parent="." node_paths=PackedStringArray("camera_rig")]
+script = ExtResource("5_interaction")
+camera_rig = NodePath("../CameraRig")
+
+[node name="Hud" parent="." instance=ExtResource("6_hud")]
