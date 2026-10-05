@@ -22,6 +22,8 @@ func _ready() -> void:
 	%DebugButton.toggled.connect(debug_toggled.emit)
 	%SaveButton.pressed.connect(func(): action_requested.emit(&"save"))
 	%LoadButton.pressed.connect(func(): action_requested.emit(&"load"))
+	%SimulateButton.pressed.connect(func(): action_requested.emit(&"pause"))
+	%BackButton.pressed.connect(func(): action_requested.emit(&"back"))
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
 		_base_margins[side] = _safe_area.get_theme_constant(side)
 	get_viewport().size_changed.connect(_apply_safe_area)
@@ -40,6 +42,12 @@ func set_interaction_hint(text: String) -> void:
 func set_status(text: String) -> void:
 	%Status.text = text
 	%Status.tooltip_text = text
+
+
+func set_simulation_state(held: bool, dragging: bool) -> void:
+	%SimulateButton.text = "Continue" if held else "Hold"
+	%SimulateButton.disabled = dragging
+	%BackButton.disabled = dragging
 
 
 func show_file_dialog(saving: bool, last_path: String = "") -> void:

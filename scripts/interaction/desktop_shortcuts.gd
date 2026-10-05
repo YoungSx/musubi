@@ -23,6 +23,7 @@ static func action_for_key(event: InputEventKey) -> StringName:
 	match key:
 		KEY_R: return &"reset"
 		KEY_F: return &"focus"
+		KEY_B: return &"back"
 		KEY_SPACE: return &"pause"
 		KEY_ESCAPE: return &"cancel"
 		KEY_F11: return &"fullscreen"

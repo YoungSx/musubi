@@ -32,6 +32,9 @@ func handle_action(action: StringName) -> void:
 	match action:
 		&"reset": reset()
 		&"focus": camera_rig.reset_view()
+		&"back":
+			interaction_manager.reset()
+			camera_rig.turn_around()
 		&"pause":
 			var held := rope.is_held()
 			interaction_manager.reset()

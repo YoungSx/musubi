@@ -75,6 +75,10 @@ func get_camera() -> Camera3D:
 	return _camera
 
 
+func turn_around() -> void:
+	_target.yaw += PI
+
+
 func get_target_yaw() -> float:
 	return _target.yaw
 

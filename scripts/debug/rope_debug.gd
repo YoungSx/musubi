@@ -12,6 +12,10 @@ var _lines := ImmediateMesh.new()
 var _line_node := MeshInstance3D.new()
 var _obstacle_node := MeshInstance3D.new()
 var _marker := MeshInstance3D.new()
+var _target_marker := MeshInstance3D.new()
+var _target_lines := ImmediateMesh.new()
+var _target_line_node := MeshInstance3D.new()
+var _end_labels: Array[Label3D] = []
 
 
 func configure(rope: Rope, mannequin: Mannequin, hud: Hud) -> void:
@@ -38,6 +42,26 @@ func configure(rope: Rope, mannequin: Mannequin, hud: Hud) -> void:
 	_marker.material_override = marker_material
 	_marker.visible = false
 	add_child(_marker)
+	_target_marker.mesh = marker_mesh
+	var target_material := marker_material.duplicate() as StandardMaterial3D
+	target_material.albedo_color = Color("79cbd1")
+	target_material.no_depth_test = true
+	_target_marker.material_override = target_material
+	_target_marker.scale = Vector3.ONE * 0.55
+	_target_marker.visible = false
+	add_child(_target_marker)
+	_target_line_node.mesh = _target_lines
+	_target_line_node.material_override = line_material
+	add_child(_target_line_node)
+	for name in ["A", "B"]:
+		var label := Label3D.new()
+		label.text = name
+		label.font_size = 24
+		label.pixel_size = 0.0012
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.modulate = Color("efc98b")
+		add_child(label)
+		_end_labels.append(label)
 	_build_obstacles(mannequin)
 	set_debug_enabled(false)
 
@@ -73,6 +97,16 @@ func _process(delta: float) -> void:
 	if _rope.end_anchor != null:
 		_rope.end_anchor.visible = _rope.is_end_attached()
 	var selected := sim.get_drag_index()
+	_hud.set_simulation_state(_rope.is_held(), selected >= 0)
+	for side in 2:
+		_end_labels[side].global_position = sim.get_point(0 if side == 0 else sim.get_point_count() - 1) + Vector3.UP * 0.05
+	_target_marker.visible = selected >= 0
+	_target_lines.clear_surfaces()
+	if selected >= 0:
+		_target_marker.global_position = sim.get_drag_target()
+		_target_lines.surface_begin(Mesh.PRIMITIVE_LINES)
+		_line(_target_lines, sim.get_point(selected), sim.get_drag_target(), Color("79cbd1"))
+		_target_lines.surface_end()
 	var marker_index := selected if selected >= 0 else _hover_index
 	_marker.visible = marker_index >= 0 and marker_index < sim.get_point_count()
 	if _marker.visible:
@@ -82,7 +116,7 @@ func _process(delta: float) -> void:
 	if _rope.is_held():
 		hint = "Shape held · Grab to continue"
 	elif selected >= 0:
-		hint = "Shape the rope · Wheel for depth · Release to hold" if OS.has_feature("pc") else "Shape the rope · Release to hold"
+		hint = "Gold: rope · Blue: target · Wheel: depth · Release: hold" if OS.has_feature("pc") else "Shape the rope · Release to hold"
 	if _hint != hint:
 		_hint = hint
 		_hud.set_interaction_hint(hint)
