@@ -5,15 +5,18 @@ extends Node
 var recorder := PerformanceRecorder.new()
 var rope: Rope
 var last_report_path := ""
+var _last_frame_usec := 0
 
 
 func _ready() -> void:
 	process_priority = 100
 
 
-func _process(delta: float) -> void:
-	if rope != null:
-		recorder.record(delta, rope.get_last_simulation_ms(), rope.get_last_mesh_ms())
+func _process(_delta: float) -> void:
+	var now := Time.get_ticks_usec()
+	if rope != null and _last_frame_usec > 0:
+		recorder.record(float(now - _last_frame_usec) / 1000000.0, rope.get_last_simulation_ms(), rope.get_last_mesh_ms())
+	_last_frame_usec = now
 
 
 func export_report(directory: String, scene_state: Dictionary = {}) -> Error:
@@ -40,7 +43,7 @@ func export_report(directory: String, scene_state: Dictionary = {}) -> Error:
 		"summary": recorder.summary(),
 		"samples_file": (base + ".csv").get_file(),
 		"scene": scene_state,
-		"measurement": "Rolling frame intervals and CPU simulation/mesh submission time; not GPU completion time.",
+		"measurement": "Monotonic wall-clock frame intervals and CPU simulation/mesh submission time; not GPU completion time.",
 	}
 	var file := FileAccess.open(base + ".json", FileAccess.WRITE)
 	if file == null:

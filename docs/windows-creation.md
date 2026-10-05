@@ -49,12 +49,12 @@ after 120 warmup frames; includes drag/release):
 | 3.0 m | 26.37 | 13.03 | 17.39 | 7.10% |
 
 These are Godot 4.7.2 Windows development measurements, not GPU completion time
-or a guarantee on other hardware. The actual rendered 3 m authoring run averaged
-59.96 FPS over 618 frames; frame interval p95 was 16.71 ms.
+or a guarantee on other hardware. Frame reports now use monotonic wall-clock
+differences between frames rather than the engine's supplied simulation delta.
 
 ## Acceptance evidence
 
-- 89 unit/integration tests pass: configuration restoration, invalid-load
+- 90 unit/integration tests pass: configuration restoration, invalid-load
   rejection, legacy loading, edit boundaries, history trimming, undo/redo
   branches, attachment restoration and keyboard mapping, alongside physics tests.
 - `verify_creation_workflow.gd` starts from the default scene, selects a long
@@ -74,9 +74,10 @@ or a guarantee on other hardware. The actual rendered 3 m authoring run averaged
   stayed at 32 entries and below the encoded-byte budget.
 - `verify_desktop_stability.gd` renders 1,200 measured frames per length, with
   fullscreen toggles and 960×640 / 1280×800 resize transitions. Measured means:
-  **59.32 / 59.65 / 59.42 FPS** for short/medium/long; p95 frame intervals **16.67 ms**.
-  Across this one-minute run: live object growth **0**, static memory growth
-  **260,180 bytes** (includes the longer rope meshes and additional history).
+  **59.55 / 59.42 / 59.51 FPS** for short/medium/long; wall-clock p95 frame intervals
+  **18.15 / 18.79 / 18.25 ms**.
+  Across this one-minute run: live object growth **2**, static memory growth
+  **279,652 bytes** (includes the longer rope meshes and additional history).
 - Default and 960×640 layouts were rendered and inspected. On short desktop
   canvases the vertical field of view widens to keep the mannequin clear of UI.
 

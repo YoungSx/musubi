@@ -1,6 +1,16 @@
 extends TestCase
 
 
+func test_capture_uses_elapsed_clock_instead_of_simulation_delta() -> void:
+	var app := add_to_tree(load("res://scenes/main/main.tscn").instantiate()) as AppController
+	app.process_mode = Node.PROCESS_MODE_DISABLED
+	var capture := app.get_node("PerformanceCapture") as PerformanceCapture
+	capture._last_frame_usec = Time.get_ticks_usec() - 20000
+	capture._process(5.0)
+	var summary := capture.recorder.summary()
+	assert_true(summary.frame_ms_mean >= 19.0 and summary.frame_ms_mean < 100.0, "wall clock measures ~20ms independently of 5s simulation delta")
+
+
 func test_summary_uses_elapsed_time_and_nearest_rank_p95() -> void:
 	var recorder := PerformanceRecorder.new()
 	for index in 20:
