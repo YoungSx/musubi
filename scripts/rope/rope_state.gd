@@ -3,7 +3,7 @@ extends RefCounted
 ## Versioned JSON data only. Scene transforms and collision configuration are
 ## owned by the application and must be reattached after restoring a simulation.
 
-const VERSION := 1
+const VERSION := 2
 const CONFIG_RANGES := {
 	"length": Vector2(0.1, 10.0), "segment_count": Vector2(2, 256),
 	"radius": Vector2(0.002, 0.05), "damping": Vector2(0, 20),
@@ -12,6 +12,7 @@ const CONFIG_RANGES := {
 	"friction": Vector2(0, 1), "simulation_rate": Vector2(30, 480),
 	"max_steps_per_tick": Vector2(1, 16), "drag_compliance": Vector2(0.00001, 0.01),
 	"drag_speed": Vector2(0.1, 5),
+	"self_friction": Vector2(0, 1),
 }
 
 
@@ -21,6 +22,7 @@ static func encode(config: RopeConfig, positions: PackedVector3Array, previous: 
 	for key in CONFIG_RANGES:
 		parameters[key] = config.get(key)
 	parameters["gravity"] = _vector(config.gravity)
+	parameters["self_collision_enabled"] = config.self_collision_enabled
 	var points: Array = []
 	var history: Array = []
 	for i in positions.size():
@@ -33,13 +35,18 @@ static func encode(config: RopeConfig, positions: PackedVector3Array, previous: 
 
 ## Validate before allocating a simulation; malformed payloads return empty.
 static func decode(data: Dictionary) -> Dictionary:
-	if not _number(data.get("version")) or data.version != VERSION:
+	if not _number(data.get("version")) or (data.version != 1 and data.version != VERSION):
 		return {}
 	if not data.get("config") is Dictionary:
 		return {}
 	var config := RopeConfig.new()
+	# Old files retain their original simulation behavior on load.
+	var enabled: Variant = data.config.get("self_collision_enabled", false if data.version == 1 else null)
+	if not enabled is bool:
+		return {}
+	config.self_collision_enabled = enabled
 	for key in CONFIG_RANGES:
-		var value: Variant = data.config.get(key)
+		var value: Variant = data.config.get(key, 0.18 if key == "self_friction" and data.version == 1 else null)
 		var limits: Vector2 = CONFIG_RANGES[key]
 		if not _number(value) or value < limits.x - 1e-9 or value > limits.y + 1e-9:
 			return {}

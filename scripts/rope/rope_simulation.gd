@@ -16,6 +16,7 @@ var _inverse_mass := PackedFloat32Array()
 var _lambdas := PackedFloat32Array()
 var _last_substep := 0.0
 var _collision: RopeCollision
+var _self_collision := RopeSelfCollision.new()
 var _drag_index := -1
 var _drag_target := Vector3.ZERO
 var _drag_lambda := Vector3.ZERO
@@ -42,6 +43,7 @@ func step(dt: float) -> void:
 	var alpha := _config.stretch_compliance / (h * h)
 	var sweep := 0
 	for substep in _config.substeps:
+		var start := _positions.duplicate() if _config.self_collision_enabled else PackedVector3Array()
 		_integrate(h)
 		_lambdas.fill(0.0)
 		_drag_lambda = Vector3.ZERO
@@ -49,6 +51,8 @@ func step(dt: float) -> void:
 			_solve_drag(h)
 			# Alternating sweep direction avoids a bias toward one end.
 			_solve_distances(alpha, sweep % 2 == 1)
+			if _config.self_collision_enabled:
+				_self_collision.solve(_positions, _previous, _inverse_mass, start, _config.radius, _config.get_rest_length(), _config.self_friction)
 			if _collision != null:
 				for contact_pass in _config.collision_iterations:
 					_collision.solve(_positions, _previous, _inverse_mass, _config.radius, _config.friction)
@@ -58,6 +62,15 @@ func step(dt: float) -> void:
 
 func set_collision(collision: RopeCollision) -> void:
 	_collision = collision
+
+
+func is_self_collision_enabled() -> bool:
+	return _config.self_collision_enabled
+
+
+## Contacts resolved in the most recent constraint pass (not unique contacts).
+func get_self_contact_count() -> int:
+	return _self_collision.contacts if _config.self_collision_enabled else 0
 
 
 func capture_state() -> Dictionary:

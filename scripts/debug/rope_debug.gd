@@ -105,7 +105,7 @@ func _process(delta: float) -> void:
 		_hud.set_diagnostics("%d FPS · sim %.2f ms · mesh %.2f ms\n%d iterations × %d substeps · %d Hz\nLength %.3f m · stretch %.1f%% · selected %d" % [
 			Engine.get_frames_per_second(), _rope.get_last_simulation_ms(), _rope.get_last_mesh_ms(),
 			_rope.config.solver_iterations, _rope.config.substeps, _rope.config.simulation_rate,
-			sim.get_length(), sim.get_max_segment_stretch() * 100.0, selected])
+			sim.get_length(), sim.get_max_segment_stretch() * 100.0, selected] + "\nSelf contact: %s · last pass %d" % ["on" if sim.is_self_collision_enabled() else "off", sim.get_self_contact_count()])
 
 
 func _build_obstacles(mannequin: Mannequin) -> void:

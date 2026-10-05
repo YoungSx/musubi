@@ -15,6 +15,8 @@ No third-party dependencies are required.
   damping and fixed simulation steps.
 - Sphere, capsule and oriented-box contacts derived from mannequin data,
   including rope segment interiors, floor contact and friction.
+- Rope self-contact between nonlocal segments, with mass-weighted separation,
+  relative sliding friction and bounded swept crossing checks.
 - Camera orbit, zoom and pan; Reset restores the camera, mannequin pose and
   rope simulation and original anchor positions.
 - Grab visible rope segments with a finger or mouse. A soft positional
@@ -53,6 +55,7 @@ and double-click `Musubi.exe`, keeping `Musubi.pck` alongside it.
 | `scripts/rope/rope_layout.gd` | Initial centerline geometry |
 | `scripts/rope/rope_simulation.gd` | Particles, pins and constraint solving; no nodes or input |
 | `scripts/rope/rope_collision.gd` | Primitive contacts, segment projection and bounded motion sweeps |
+| `scripts/rope/rope_self_collision.gd` | Swept segment bounds, rope/rope contacts and relative friction |
 | `scripts/rope/rope_renderer.gd` | Centerline to a single tube mesh |
 | `scripts/rope/rope.gd` | Fixed-step scheduling, anchors and renderer wiring |
 | `scripts/interaction/rope_interaction.gd` | Visible-segment picking, grab plane and solver intent |
@@ -74,6 +77,7 @@ godot --headless --path . --import
 godot --headless --path . -s res://tests/run_tests.gd
 godot --path . -s res://tools/capture_screenshot.gd -- <absolute-output.png> 180
 godot --path . -s res://tools/verify_interaction.gd -- <output-directory>
+godot --path . -s res://tools/verify_self_collision.gd -- <output-directory>
 ```
 
 The screenshot command requires a graphics driver and an existing output
@@ -81,7 +85,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 69 tests passed. A rendered scene smoke check exercised camera orbit,
+All 78 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -99,12 +103,16 @@ the Rope node's held/catch-up state are application data and are not included
 in this simulation snapshot. `MusubiSceneState` adds these fields for full
 creation files, validates before changing the live scene and replaces files
 only after a successful temporary-file write. Invalid files leave the scene intact.
+Simulation format v2 includes self-contact settings. Existing v1 creations load
+with self-contact disabled to preserve their behavior; Reset starts a new rope
+with the current default (enabled). Debug shows the active setting and last-pass
+contact count. See [self-contact implementation and verification](docs/rope-self-collision.md).
 
 ## Remaining validation and next milestone
 
 - Collision supports rigid transforms and positive uniform scale. Motion
-  sweeps are bounded; rope self-collision and arbitrary-speed continuous
-  collision detection are not implemented. Default mannequin contact tests
+  sweeps are bounded; arbitrary-speed continuous collision detection and
+  guaranteed knot topology are not implemented. Default mannequin contact tests
   check segment clearance, length, settling and friction.
 - Profile both solver and renderer on iPad. Cached segment bounds and radial
   trigonometry reduced Windows headless solver time about 15% and mesh work

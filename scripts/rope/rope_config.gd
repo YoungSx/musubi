@@ -24,6 +24,8 @@ extends Resource
 @export_range(1, 8, 1) var collision_iterations: int = 1
 ## Fraction of tangential velocity removed when a particle contacts a surface.
 @export_range(0.0, 1.0, 0.01) var friction: float = 0.18
+@export var self_collision_enabled: bool = true
+@export_range(0.0, 1.0, 0.01) var self_friction: float = 0.18
 @export_range(30, 480, 1, "suffix:Hz") var simulation_rate: int = 120
 ## Upper bound on simulation steps per physics tick, so a long frame hitch
 ## slows the rope down instead of stalling the app.
