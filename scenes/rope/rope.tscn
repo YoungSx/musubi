@@ -19,12 +19,12 @@ start_anchor = NodePath("StartAnchor")
 end_anchor = NodePath("EndAnchor")
 
 [node name="StartAnchor" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.45, 0.32)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.45, 0.12)
 mesh = SubResource("SphereMesh_anchor")
 surface_material_override/0 = ExtResource("5_anchor_material")
 
 [node name="EndAnchor" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.45, 0.32)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.45, 0.12)
 mesh = SubResource("SphereMesh_anchor")
 surface_material_override/0 = ExtResource("5_anchor_material")
 

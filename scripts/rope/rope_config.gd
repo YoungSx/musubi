@@ -17,6 +17,10 @@ extends Resource
 @export_range(1, 32, 1) var substeps: int = 6
 ## Constraint iterations per substep.
 @export_range(1, 64, 1) var solver_iterations: int = 2
+## Contact passes after each distance sweep. Primitive contacts are static.
+@export_range(1, 8, 1) var collision_iterations: int = 1
+## Fraction of tangential velocity removed when a particle contacts a surface.
+@export_range(0.0, 1.0, 0.01) var friction: float = 0.18
 @export_range(30, 480, 1, "suffix:Hz") var simulation_rate: int = 120
 ## Upper bound on simulation steps per physics tick, so a long frame hitch
 ## slows the rope down instead of stalling the app.

@@ -13,6 +13,7 @@ extends Node3D
 @export var end_anchor: Node3D
 
 var _simulation: RopeSimulation
+var _collision: RopeCollision
 var _accumulator := 0.0
 
 @onready var _renderer: RopeRenderer = $RopeRenderer
@@ -50,6 +51,7 @@ func reset() -> void:
 	var end := _anchor_position(end_anchor, start + Vector3.DOWN * config.length)
 	var points := RopeLayout.hanging(start, end, config.length, config.segment_count)
 	_simulation = RopeSimulation.new(config, points)
+	_simulation.set_collision(_collision)
 	_accumulator = 0.0
 	_sync_anchors()
 	_renderer.update_mesh(_simulation.get_positions(), config.radius)
@@ -57,6 +59,16 @@ func reset() -> void:
 
 func get_simulation() -> RopeSimulation:
 	return _simulation
+
+
+func set_collision(collision: RopeCollision) -> void:
+	_collision = collision
+	if _simulation != null:
+		_simulation.set_collision(collision)
+
+
+func get_collision() -> RopeCollision:
+	return _collision
 
 
 func _sync_anchors() -> void:

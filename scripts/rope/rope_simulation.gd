@@ -15,6 +15,7 @@ var _previous := PackedVector3Array()
 var _inverse_mass := PackedFloat32Array()
 var _lambdas := PackedFloat32Array()
 var _last_substep := 0.0
+var _collision: RopeCollision
 
 
 func _init(config: RopeConfig, initial_positions: PackedVector3Array) -> void:
@@ -32,6 +33,8 @@ func _init(config: RopeConfig, initial_positions: PackedVector3Array) -> void:
 ## far better than extra iterations on long chains (Macklin et al. 2019,
 ## "Small Steps in Physics Simulation").
 func step(dt: float) -> void:
+	if dt <= 0.0:
+		return
 	var h := dt / float(_config.substeps)
 	var alpha := _config.stretch_compliance / (h * h)
 	var sweep := 0
@@ -41,8 +44,15 @@ func step(dt: float) -> void:
 		for iteration in _config.solver_iterations:
 			# Alternating sweep direction avoids a bias toward one end.
 			_solve_distances(alpha, sweep % 2 == 1)
+			if _collision != null:
+				for contact_pass in _config.collision_iterations:
+					_collision.solve(_positions, _previous, _inverse_mass, _config.radius, _config.friction)
 			sweep += 1
 	_last_substep = h
+
+
+func set_collision(collision: RopeCollision) -> void:
+	_collision = collision
 
 
 ## Pins a particle at a world position. Moving a pinned particle is how
@@ -105,8 +115,14 @@ func _integrate(dt: float) -> void:
 		if _inverse_mass[i] == 0.0:
 			_previous[i] = current
 			continue
-		_positions[i] = current + (current - _previous[i]) * retain + gravity_step
+		var predicted := current + (current - _previous[i]) * retain + gravity_step
+		_positions[i] = predicted
 		_previous[i] = current
+		if _collision != null:
+			var constrained := _collision.constrain_motion(current, predicted, _config.radius)
+			# Apply sweep response to Verlet history as well as position. Otherwise
+			# a resting particle would keep its sliding velocity indefinitely.
+			RopeCollision.apply_contact(_positions, _previous, i, constrained - predicted, _config.friction)
 
 
 func _solve_distances(alpha: float, reverse: bool) -> void:

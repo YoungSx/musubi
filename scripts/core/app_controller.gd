@@ -14,11 +14,19 @@ extends Node3D
 func _ready() -> void:
 	assert(camera_rig and mannequin and rope and interaction_manager and hud, "AppController is missing a module reference.")
 	hud.reset_requested.connect(reset)
+	_configure_collision()
 
 
 ## Returns every module to its initial state.
 func reset() -> void:
 	interaction_manager.reset()
-	rope.reset()
 	mannequin.reset_pose()
+	_configure_collision()
+	rope.reset()
 	camera_rig.reset_view()
+
+
+func _configure_collision() -> void:
+	var collision := RopeCollision.new()
+	collision.configure(mannequin.config, mannequin.global_transform)
+	rope.set_collision(collision)

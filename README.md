@@ -6,18 +6,20 @@ Godot 4.7.2 / GDScript prototype, targeting iOS first. Open `project.godot`
 in Godot and run the main scene (F6 from `scenes/main/main.tscn`, or F5).
 No third-party dependencies are required.
 
-## Current milestone: rope rendering and basic simulation
+## Current milestone: rope simulation and mannequin collision
 
 - Abstract mannequin and studio lighting.
 - One procedural tube mesh with rounded ends, suspended between two anchors.
 - Particle-based Verlet integration and XPBD distance constraints, gravity,
   damping and fixed simulation steps.
+- Sphere, capsule and oriented-box contacts derived from mannequin data,
+  including rope segment interiors, floor contact and friction.
 - Camera orbit, zoom and pan; Reset restores the camera, mannequin pose and
   rope simulation for the fixed-anchor scene.
 
 Touch: one finger orbits; two fingers pan and pinch to zoom.
 Mouse: left-drag orbits, right/middle-drag pans, wheel zooms.
-Rope dragging and mannequin collision are upcoming milestones.
+Rope dragging is the next milestone.
 
 ## Module boundaries
 
@@ -26,6 +28,7 @@ Rope dragging and mannequin collision are upcoming milestones.
 | `scripts/rope/rope_config.gd`, `data/rope/` | Physical parameters and preset |
 | `scripts/rope/rope_layout.gd` | Initial centerline geometry |
 | `scripts/rope/rope_simulation.gd` | Particles, pins and constraint solving; no nodes or input |
+| `scripts/rope/rope_collision.gd` | Primitive contacts, segment projection and bounded motion sweeps |
 | `scripts/rope/rope_renderer.gd` | Centerline to a single tube mesh |
 | `scripts/rope/rope.gd` | Fixed-step scheduling, anchors and renderer wiring |
 | `scripts/core/app_controller.gd` | Scene wiring and Reset |
@@ -51,14 +54,16 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 26 tests passed. A rendered scene smoke check exercised camera orbit,
+All 35 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 This checks scene integration, not physical touchscreen input.
 
 ## Remaining validation and next milestone
 
-- Add a separate `RopeCollision` module using mannequin sphere/capsule data,
-  then test penetration, contact stability and length under collision.
+- Collision supports rigid transforms and positive uniform scale. Motion
+  sweeps are bounded; rope self-collision and arbitrary-speed continuous
+  collision detection are not implemented. Default mannequin contact tests
+  check segment clearance, length, settling and friction.
 - Add segment picking and temporary drag constraints in `RopeInteraction`.
   Define anchor removal and anchor Reset semantics at that stage: currently
   removing an anchor reference alone does not release its pin, and Reset
