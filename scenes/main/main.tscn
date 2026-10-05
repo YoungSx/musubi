@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/debug/rope_debug.gd" id="8_debug"]
 [ext_resource type="Script" path="res://scripts/core/desktop_window.gd" id="9_window"]
 [ext_resource type="Script" path="res://scripts/interaction/desktop_shortcuts.gd" id="10_shortcuts"]
+[ext_resource type="Script" path="res://scripts/debug/performance_capture.gd" id="11_performance"]
 
 [node name="Main" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "interaction_manager", "hud", "rope_debug")]
 script = ExtResource("1_app")
@@ -43,3 +44,6 @@ script = ExtResource("9_window")
 
 [node name="DesktopShortcuts" type="Node" parent="."]
 script = ExtResource("10_shortcuts")
+
+[node name="PerformanceCapture" type="Node" parent="."]
+script = ExtResource("11_performance")

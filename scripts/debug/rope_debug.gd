@@ -60,6 +60,10 @@ func set_hover_index(index: int) -> void:
 	_hover_index = index
 
 
+func refresh_collision(mannequin: Mannequin) -> void:
+	_build_obstacles(mannequin)
+
+
 func _process(delta: float) -> void:
 	if _rope == null:
 		return

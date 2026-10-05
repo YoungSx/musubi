@@ -76,8 +76,89 @@ func _run() -> void:
 	_key(KEY_F)
 	await _frames(1)
 	_check(is_equal_approx(app.camera_rig.get_target_yaw(), deg_to_rad(app.camera_rig.config.yaw_degrees)), "F restores view")
+	_key(KEY_F9)
+	await _frames(1)
+	var report_path: String = app.get_node("PerformanceCapture").last_report_path
+	_check(not report_path.is_empty() and FileAccess.file_exists(report_path), "F9 writes performance report")
+	if not report_path.is_empty():
+		var report: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(report_path))
+		_check(report.summary.sample_count > 0 and report.summary.frame_ms_p95 > 0, "report contains measured frame timings")
+	app.reset()
+	await _frames(30)
+	position = camera.unproject_position(app.rope.get_simulation().get_point(0))
+	_button(position, true)
+	await _frames(1)
+	_check(app.interaction_manager.get_selected_index() == 0, "real input selects anchored endpoint")
+	_check(not app.rope.is_start_attached(), "grabbing endpoint detaches it")
+	var camera_distance := app.camera_rig.get_target_distance()
+	var target_before := app.rope.get_simulation().get_drag_target()
+	var wheel := InputEventMouseButton.new()
+	wheel.position = root.get_final_transform() * position
+	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	wheel.pressed = true
+	Input.parse_input_event(wheel)
+	await _frames(15)
+	_check(app.rope.get_simulation().get_drag_target().distance_to(target_before) > 0.01, "wheel changes endpoint depth")
+	_check(is_equal_approx(camera_distance, app.camera_rig.get_target_distance()), "depth wheel preserves camera distance")
+	await _capture("endpoint")
+	_key(KEY_ESCAPE)
+	await _frames(1)
+	_check(app.rope.is_start_attached() and app.rope.is_end_attached(), "Esc restores endpoint attachments")
+	_button(position, false)
+	await _verify_creation_dialogs()
 	print("Rendered interaction smoke: %d failures" % failures)
 	quit(1 if failures else 0)
+
+
+func _verify_creation_dialogs() -> void:
+	app.rope.set_held(true)
+	await _frames(45)
+	var saved := MusubiSceneState.capture(app)
+	var path := output.path_join("smoke-%d.musubi" % Time.get_ticks_usec())
+	var save_button := app.hud.get_node("%SaveButton") as Button
+	_button(save_button.get_global_rect().get_center(), true)
+	_button(save_button.get_global_rect().get_center(), false)
+	await _frames(2)
+	var dialog := app.hud._file_dialog
+	_check(dialog != null and dialog.visible and dialog.file_mode == FileDialog.FILE_MODE_SAVE_FILE, "Save button opens save dialog")
+	await _capture("save-dialog")
+	# File selection is dispatched through the dialog signal; filesystem behavior
+	# and exact scene restoration are checked below, without automating OS dialogs.
+	dialog.file_selected.emit(path)
+	dialog.hide()
+	_check(FileAccess.file_exists(path), "save dialog selection writes creation")
+	app.reset()
+	await _frames(10)
+	var open_button := app.hud.get_node("%LoadButton") as Button
+	_button(open_button.get_global_rect().get_center(), true)
+	_button(open_button.get_global_rect().get_center(), false)
+	await _frames(2)
+	_check(dialog.visible and dialog.file_mode == FileDialog.FILE_MODE_OPEN_FILE, "Open button opens load dialog")
+	dialog.file_selected.emit(path)
+	dialog.hide()
+	_check(_states_match(MusubiSceneState.capture(app), saved), "load dialog selection restores complete scene")
+	await _capture("loaded")
+	_check(DirAccess.remove_absolute(path) == OK, "temporary smoke creation removed")
+
+
+func _states_match(actual: Variant, expected: Variant) -> bool:
+	if expected is Dictionary:
+		if not actual is Dictionary or actual.size() != expected.size():
+			return false
+		for key in expected:
+			if not actual.has(key) or not _states_match(actual[key], expected[key]):
+				return false
+		return true
+	if expected is Array:
+		if not actual is Array or actual.size() != expected.size():
+			return false
+		for index in expected.size():
+			if not _states_match(actual[index], expected[index]):
+				return false
+		return true
+	if expected is float:
+		return (actual is float or actual is int) and absf(actual - expected) < 1e-12
+	return actual == expected
 
 
 func _button(position: Vector2, pressed: bool) -> void:

@@ -91,6 +91,61 @@ func get_target_focus() -> Vector3:
 	return _target.focus
 
 
+## Stores both sides of the easing operation so loading does not jump views.
+func capture_state() -> Dictionary:
+	return {"config_path": config.resource_path, "current": _encode_orbit(_current), "target": _encode_orbit(_target)}
+
+
+func validate_state(data: Dictionary) -> bool:
+	if config == null or data.get("config_path") != config.resource_path:
+		return false
+	for key in ["current", "target"]:
+		var view: Variant = data.get(key)
+		if not view is Dictionary:
+			return false
+		for field in ["yaw", "pitch", "distance"]:
+			if not _finite_number(view.get(field)):
+				return false
+		var focus: Variant = view.get("focus")
+		if not focus is Array or focus.size() != 3:
+			return false
+		for coordinate in focus:
+			if not _finite_number(coordinate):
+				return false
+		var point := Vector3(focus[0], focus[1], focus[2])
+		if not point.is_finite() or point.distance_to(config.focus) > config.max_focus_offset + 0.00001:
+			return false
+		if view.distance < config.min_distance or view.distance > config.max_distance:
+			return false
+		if view.pitch < deg_to_rad(config.min_pitch_degrees) or view.pitch > deg_to_rad(config.max_pitch_degrees):
+			return false
+	return true
+
+
+func restore_state(data: Dictionary) -> bool:
+	if not validate_state(data):
+		return false
+	_decode_orbit(data.current, _current)
+	_decode_orbit(data.target, _target)
+	_apply_current()
+	return true
+
+
+static func _finite_number(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value))
+
+
+static func _encode_orbit(view: OrbitState) -> Dictionary:
+	return {"yaw": view.yaw, "pitch": view.pitch, "distance": view.distance, "focus": [view.focus.x, view.focus.y, view.focus.z]}
+
+
+static func _decode_orbit(data: Dictionary, view: OrbitState) -> void:
+	view.yaw = data.yaw
+	view.pitch = data.pitch
+	view.distance = data.distance
+	view.focus = Vector3(data.focus[0], data.focus[1], data.focus[2])
+
+
 func _apply_current() -> void:
 	_camera.transform = compute_camera_transform(_current.yaw, _current.pitch, _current.distance, _current.focus)
 

@@ -47,15 +47,24 @@ text = "Drag rope · Drag space to orbit"
 horizontal_alignment = 1
 mouse_filter = 2
 
+[node name="Status" type="Label" parent="SafeArea/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SubtitleLabel"
+text = ""
+horizontal_alignment = 1
+text_overrun_behavior = 3
+mouse_filter = 2
+
 [node name="Actions" type="HBoxContainer" parent="SafeArea/Layout"]
 layout_mode = 2
 alignment = 1
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 mouse_filter = 2
 
 [node name="ResetButton" type="Button" parent="SafeArea/Layout/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 44)
+custom_minimum_size = Vector2(96, 44)
 layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
@@ -63,18 +72,36 @@ text = "Reset"
 
 [node name="DebugButton" type="Button" parent="SafeArea/Layout/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(104, 44)
+custom_minimum_size = Vector2(76, 44)
 layout_mode = 2
 focus_mode = 0
 toggle_mode = true
 text = "Debug"
+tooltip_text = "Show diagnostics · F9 saves a performance report"
+
+[node name="SaveButton" type="Button" parent="SafeArea/Layout/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Save"
+tooltip_text = "Save creation · Ctrl+S"
+
+[node name="LoadButton" type="Button" parent="SafeArea/Layout/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Open"
+tooltip_text = "Open creation · Ctrl+O"
 
 [node name="Shortcuts" type="Label" parent="SafeArea/Layout"]
 layout_mode = 2
 theme_type_variation = &"SubtitleLabel"
-text = "R  Reset     F  View     Space  Pause     Esc  Cancel     F11  Full screen"
+text = "R  Reset · F  View · Space  Pause · Esc  Cancel · F11  Full screen · F9  Report"
 horizontal_alignment = 1
 mouse_filter = 2
+autowrap_mode = 2
 
 [node name="Diagnostics" type="Label" parent="."]
 unique_name_in_owner = true

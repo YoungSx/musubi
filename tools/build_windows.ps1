@@ -118,6 +118,12 @@ Musubi - Windows x64 prototype
 Double-click Musubi.exe. Keep Musubi.pck next to it.
 No Godot editor installation is required on the test computer.
 
+Left drag: shape rope or orbit empty space. Right/middle drag: pan.
+Wheel: zoom, or move the grabbed rope in depth. Grab an endpoint to free it.
+Release: hold shape. Esc: cancel grab. R: reset. F: restore view.
+Space: pause/resume. F11: full screen. Ctrl+S / Ctrl+O: save/open creation.
+F9: export performance JSON/CSV and scene snapshot to the reports data folder.
+
 Build: $revision ($Configuration); local changes: $isDirty
 Engine: $engineVersion
 Build details and payload checksums: build-info.json
