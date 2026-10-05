@@ -16,7 +16,7 @@ No third-party dependencies are required.
 - Sphere, capsule and oriented-box contacts derived from mannequin data,
   including rope segment interiors, floor contact and friction.
 - Camera orbit, zoom and pan; Reset restores the camera, mannequin pose and
-  rope simulation for the fixed-anchor scene.
+  rope simulation and original anchor positions.
 - Grab visible rope segments with a finger or mouse. A soft positional
   constraint responds to the pointer while respecting attachments and contacts.
   Release holds the current shape; grabbing again resumes simulation.
@@ -27,7 +27,10 @@ No third-party dependencies are required.
 
 Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
 and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
-pans, wheel zooms. The two dark attachment endpoints stay fixed.
+pans, wheel zooms. Grab either dark endpoint to release that attachment;
+release keeps it free and holds the shape. The wheel moves the grabbed rope
+toward/away from the camera during a drag. Esc restores the complete pre-grab
+shape and attachments; Reset restores both original attachments.
 
 Desktop: the rope highlights on hover. R resets the scene, F restores the view,
 Space pauses/resumes, Esc cancels a grab and restores its starting shape, and
@@ -69,7 +72,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 56 tests passed. A rendered scene smoke check exercised camera orbit,
+All 61 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -90,10 +93,6 @@ in this simulation snapshot. No save UI or filesystem writes are added.
   sweeps are bounded; rope self-collision and arbitrary-speed continuous
   collision detection are not implemented. Default mannequin contact tests
   check segment clearance, length, settling and friction.
-- The current attachments stay fixed. Before making them movable, define
-  anchor removal and anchor Reset semantics: currently
-  removing an anchor reference alone does not release its pin, and Reset
-  rebuilds from current anchor positions.
 - Profile both solver and renderer on iPad. Cached segment bounds and radial
   trigonometry reduced Windows headless solver time about 15% and mesh work
   about 21% in a same-process comparison. Held frames skip mesh updates.

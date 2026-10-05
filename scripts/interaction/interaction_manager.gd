@@ -110,7 +110,10 @@ func _on_secondary_drag(relative: Vector2) -> void:
 
 
 func _on_zoom(factor: float) -> void:
-	camera_rig.zoom(factor)
+	if _rope_interaction.get_selected_index() >= 0:
+		_rope_interaction.adjust_depth(factor)
+	else:
+		camera_rig.zoom(factor)
 
 
 ## Normalizes pixel deltas by screen height so gestures feel identical on

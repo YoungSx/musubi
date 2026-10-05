@@ -28,11 +28,14 @@ func test_visible_segment_grab_has_no_jump_and_moves_target_only() -> void:
 	assert_eq(_rope.get_simulation().get_drag_index(), -1, "end removes temporary constraint")
 
 
-func test_fixed_endpoints_and_hidden_rope_are_not_picked() -> void:
+func test_endpoints_can_be_picked_but_hidden_rope_cannot() -> void:
 	_setup()
 	var interaction := RopeInteraction.new()
 	interaction.configure(_rope, _rig.get_camera())
-	assert_true(not interaction.begin(_screen(0)), "fixed endpoint excluded")
+	assert_true(interaction.begin(_screen(0)), "attached endpoint can be grabbed")
+	assert_true(not _rope.is_start_attached(), "grabbing endpoint releases its attachment")
+	interaction.cancel()
+	assert_true(_rope.is_start_attached(), "cancel restores endpoint attachment")
 	var part := MannequinPart.new()
 	part.primitive = MannequinPart.Primitive.SPHERE
 	part.radius = 0.15

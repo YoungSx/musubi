@@ -9,6 +9,11 @@ var _camera: Camera3D
 var _selected_index := -1
 var _drag_plane := Plane()
 var _grab_offset := Vector3.ZERO
+var _last_screen_position := Vector2.ZERO
+var _drag_origin := Vector3.ZERO
+var _drag_depth := 0.0
+var _min_depth := 0.1
+var _max_depth := 10.0
 
 
 func configure(rope: Rope, camera: Camera3D) -> void:
@@ -31,15 +36,35 @@ func begin(screen_position: Vector2) -> bool:
 		return false
 	_selected_index = index
 	_grab_offset = point - (intersection as Vector3)
+	_last_screen_position = screen_position
+	_drag_origin = _camera.global_position
+	_drag_depth = _drag_plane.normal.dot(_drag_origin - point)
+	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
+	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
 	return true
 
 
 func move(screen_position: Vector2) -> void:
 	if _selected_index < 0:
 		return
+	_last_screen_position = screen_position
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection != null:
 		_rope.update_drag_target((intersection as Vector3) + _grab_offset)
+
+
+## Wheel-up moves the active plane toward the viewer. Reachability and soft
+## collision response remain solver responsibilities, including free ends.
+func adjust_depth(factor: float) -> void:
+	if _selected_index < 0 or not is_finite(factor) or factor <= 0.0:
+		return
+	_drag_depth = clampf(_drag_depth / factor, _min_depth, _max_depth)
+	_drag_plane = Plane(_drag_plane.normal, _drag_origin - _drag_plane.normal * _drag_depth)
+	move(_last_screen_position)
+
+
+func get_drag_depth() -> float:
+	return _drag_depth
 
 
 func end() -> void:
@@ -82,7 +107,7 @@ func _pick(screen_position: Vector2) -> int:
 		if distance > best_distance + 0.01:
 			continue
 		var index := i if t < 0.5 else i + 1
-		if simulation.is_pinned(index):
+		if not _rope.can_drag(index):
 			continue
 		var candidate := points[i].lerp(points[i + 1], t)
 		var depth := _camera.global_position.distance_squared_to(candidate)

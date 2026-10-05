@@ -64,6 +64,10 @@ func _process(delta: float) -> void:
 	if _rope == null:
 		return
 	var sim := _rope.get_simulation()
+	if _rope.start_anchor != null:
+		_rope.start_anchor.visible = _rope.is_start_attached()
+	if _rope.end_anchor != null:
+		_rope.end_anchor.visible = _rope.is_end_attached()
 	var selected := sim.get_drag_index()
 	var marker_index := selected if selected >= 0 else _hover_index
 	_marker.visible = marker_index >= 0 and marker_index < sim.get_point_count()
@@ -74,7 +78,7 @@ func _process(delta: float) -> void:
 	if _rope.is_held():
 		hint = "Shape held · Grab to continue"
 	elif selected >= 0:
-		hint = "Shape the rope · Release to hold"
+		hint = "Shape the rope · Wheel for depth · Release to hold" if OS.has_feature("pc") else "Shape the rope · Release to hold"
 	if _hint != hint:
 		_hint = hint
 		_hud.set_interaction_hint(hint)
