@@ -1,0 +1,101 @@
+class_name RopeState
+extends RefCounted
+## Versioned JSON data only. Scene transforms and collision configuration are
+## owned by the application and must be reattached after restoring a simulation.
+
+const VERSION := 1
+const CONFIG_RANGES := {
+	"length": Vector2(0.1, 10.0), "segment_count": Vector2(2, 256),
+	"radius": Vector2(0.002, 0.05), "damping": Vector2(0, 20),
+	"stretch_compliance": Vector2(0, 0.01), "substeps": Vector2(1, 32),
+	"solver_iterations": Vector2(1, 64), "collision_iterations": Vector2(1, 8),
+	"friction": Vector2(0, 1), "simulation_rate": Vector2(30, 480),
+	"max_steps_per_tick": Vector2(1, 16), "drag_compliance": Vector2(0.00001, 0.01),
+	"drag_speed": Vector2(0.1, 5),
+}
+
+
+static func encode(config: RopeConfig, positions: PackedVector3Array, previous: PackedVector3Array,
+		masses: PackedFloat32Array, last_substep: float, drag_index: int, target: Vector3) -> Dictionary:
+	var parameters := {}
+	for key in CONFIG_RANGES:
+		parameters[key] = config.get(key)
+	parameters["gravity"] = _vector(config.gravity)
+	var points: Array = []
+	var history: Array = []
+	for i in positions.size():
+		points.append(_vector(positions[i]))
+		history.append(_vector(previous[i]))
+	return {"version": VERSION, "config": parameters, "positions": points,
+		"previous": history, "inverse_mass": Array(masses), "last_substep": last_substep,
+		"drag_index": drag_index, "drag_target": _vector(target)}
+
+
+## Validate before allocating a simulation; malformed payloads return empty.
+static func decode(data: Dictionary) -> Dictionary:
+	if not _number(data.get("version")) or data.version != VERSION:
+		return {}
+	if not data.get("config") is Dictionary:
+		return {}
+	var config := RopeConfig.new()
+	for key in CONFIG_RANGES:
+		var value: Variant = data.config.get(key)
+		var limits: Vector2 = CONFIG_RANGES[key]
+		if not _number(value) or value < limits.x - 1e-9 or value > limits.y + 1e-9:
+			return {}
+		if config.get(key) is int:
+			if value != floor(value):
+				return {}
+			config.set(key, int(value))
+		else:
+			config.set(key, float(value))
+	if not _valid_vector(data.config.get("gravity")) or not _valid_vector(data.get("drag_target")):
+		return {}
+	config.gravity = _read_vector(data.config.gravity)
+	var count := config.segment_count + 1
+	for key in ["positions", "previous", "inverse_mass"]:
+		if not data.get(key) is Array or data[key].size() != count:
+			return {}
+	if not _number(data.get("last_substep")) or data.last_substep < 0:
+		return {}
+	var drag: Variant = data.get("drag_index")
+	if not _number(drag) or drag != floor(drag) or drag < -1 or drag >= count:
+		return {}
+	var positions := PackedVector3Array()
+	var previous := PackedVector3Array()
+	var masses := PackedFloat32Array()
+	for i in count:
+		if not _valid_vector(data.positions[i]) or not _valid_vector(data.previous[i]):
+			return {}
+		var mass: Variant = data.inverse_mass[i]
+		if not _number(mass) or (mass != 0.0 and mass != 1.0):
+			return {}
+		positions.append(_read_vector(data.positions[i]))
+		previous.append(_read_vector(data.previous[i]))
+		masses.append(mass)
+	if drag >= 0 and masses[int(drag)] == 0.0:
+		return {}
+	return {"config": config, "positions": positions, "previous": previous,
+		"inverse_mass": masses, "last_substep": float(data.last_substep),
+		"drag_index": int(drag), "drag_target": _read_vector(data.drag_target)}
+
+
+static func _number(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value))
+
+
+static func _valid_vector(value: Variant) -> bool:
+	if not value is Array or value.size() != 3:
+		return false
+	for component in value:
+		if not _number(component) or absf(float(component)) > 1000000.0:
+			return false
+	return true
+
+
+static func _vector(value: Vector3) -> Array:
+	return [value.x, value.y, value.z]
+
+
+static func _read_vector(value: Array) -> Vector3:
+	return Vector3(float(value[0]), float(value[1]), float(value[2]))

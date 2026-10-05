@@ -21,6 +21,8 @@ No third-party dependencies are required.
   Release holds the current shape; grabbing again resumes simulation.
 - Grab marker and contextual hints. A developer-only Debug toggle reveals
   rope particles, constraints, collision outlines, selection, FPS and timings.
+- Versioned JSON simulation snapshots preserve configuration, particles,
+  velocity history, pins and active grab state for future local save/replay.
 
 Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
 and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
@@ -61,13 +63,20 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 50 tests passed. A rendered scene smoke check exercised camera orbit,
+All 53 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
 It also clicks Debug and captures the diagnostic overlay.
 This checks scene integration, not physical touchscreen input. Tests cover
 two-finger transitions, cancellation, focus loss and occluded picking.
+
+`RopeSimulation.capture_state()` returns detached JSON-compatible data;
+`RopeSimulation.restore_state(data)` returns a new simulation, or `null` for
+invalid data. Use `JSON.stringify(state, "", true, true)` for full precision.
+Round-trip continuation is tested. Collision geometry, scene transforms and
+the Rope node's held/catch-up state are application data and are not included
+in this simulation snapshot. No save UI or filesystem writes are added.
 
 ## Remaining validation and next milestone
 

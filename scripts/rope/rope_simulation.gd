@@ -60,6 +60,24 @@ func set_collision(collision: RopeCollision) -> void:
 	_collision = collision
 
 
+func capture_state() -> Dictionary:
+	return RopeState.encode(_config, _positions, _previous, _inverse_mass,
+		_last_substep, _drag_index, _drag_target)
+
+
+static func restore_state(data: Dictionary) -> RopeSimulation:
+	var state := RopeState.decode(data)
+	if state.is_empty():
+		return null
+	var simulation := RopeSimulation.new(state.config, state.positions)
+	simulation._previous = state.previous
+	simulation._inverse_mass = state.inverse_mass
+	simulation._last_substep = state.last_substep
+	simulation._drag_index = state.drag_index
+	simulation._drag_target = state.drag_target
+	return simulation
+
+
 func begin_drag(index: int) -> bool:
 	if index < 0 or index >= _positions.size() or is_pinned(index):
 		return false
