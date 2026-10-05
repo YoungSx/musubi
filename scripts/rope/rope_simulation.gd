@@ -1,0 +1,130 @@
+class_name RopeSimulation
+extends RefCounted
+## Particle rope: Verlet integration + XPBD distance constraints.
+##
+##   integrate (gravity, damping) -> reset multipliers -> solve constraints xN
+##
+## Pure data and math: no nodes, rendering or input. Positions are in world
+## space. A particle with zero inverse mass is pinned: the solver never moves
+## it, only pin() does. Attachments and user interaction are expressed as pins,
+## so the user never edits the rope directly; they constrain it.
+
+var _config: RopeConfig
+var _positions := PackedVector3Array()
+var _previous := PackedVector3Array()
+var _inverse_mass := PackedFloat32Array()
+var _lambdas := PackedFloat32Array()
+var _last_substep := 0.0
+
+
+func _init(config: RopeConfig, initial_positions: PackedVector3Array) -> void:
+	assert(config != null, "RopeSimulation requires a RopeConfig.")
+	assert(initial_positions.size() == config.segment_count + 1, "Expected segment_count + 1 points.")
+	_config = config
+	_positions = initial_positions.duplicate()
+	_previous = initial_positions.duplicate()
+	_inverse_mass.resize(_positions.size())
+	_inverse_mass.fill(1.0)
+	_lambdas.resize(_positions.size() - 1)
+
+
+## Advances by dt using RopeConfig.substeps small steps. Substepping converges
+## far better than extra iterations on long chains (Macklin et al. 2019,
+## "Small Steps in Physics Simulation").
+func step(dt: float) -> void:
+	var h := dt / float(_config.substeps)
+	var alpha := _config.stretch_compliance / (h * h)
+	var sweep := 0
+	for substep in _config.substeps:
+		_integrate(h)
+		_lambdas.fill(0.0)
+		for iteration in _config.solver_iterations:
+			# Alternating sweep direction avoids a bias toward one end.
+			_solve_distances(alpha, sweep % 2 == 1)
+			sweep += 1
+	_last_substep = h
+
+
+## Pins a particle at a world position. Moving a pinned particle is how
+## kinematic attachments (anchors, fingers) drive the rope.
+func pin(index: int, position: Vector3) -> void:
+	_inverse_mass[index] = 0.0
+	_positions[index] = position
+	_previous[index] = position
+
+
+func unpin(index: int) -> void:
+	_inverse_mass[index] = 1.0
+
+
+func is_pinned(index: int) -> bool:
+	return _inverse_mass[index] == 0.0
+
+
+func get_point_count() -> int:
+	return _positions.size()
+
+
+func get_point(index: int) -> Vector3:
+	return _positions[index]
+
+
+## Copy-on-write snapshot. Do not keep it across steps, or every step pays
+## for a copy.
+func get_positions() -> PackedVector3Array:
+	return _positions
+
+
+func get_length() -> float:
+	return RopeLayout.polyline_length(_positions)
+
+
+func get_max_segment_stretch() -> float:
+	var rest := _config.get_rest_length()
+	var worst := 0.0
+	for i in _positions.size() - 1:
+		worst = maxf(worst, absf(_positions[i].distance_to(_positions[i + 1]) - rest) / rest)
+	return worst
+
+
+## Highest particle speed over the last substep. 0 before the first step.
+func get_max_speed() -> float:
+	if _last_substep <= 0.0:
+		return 0.0
+	var fastest := 0.0
+	for i in _positions.size():
+		fastest = maxf(fastest, _positions[i].distance_to(_previous[i]))
+	return fastest / _last_substep
+
+
+func _integrate(dt: float) -> void:
+	var retain := exp(-_config.damping * dt)
+	var gravity_step := _config.gravity * (dt * dt)
+	for i in _positions.size():
+		var current := _positions[i]
+		if _inverse_mass[i] == 0.0:
+			_previous[i] = current
+			continue
+		_positions[i] = current + (current - _previous[i]) * retain + gravity_step
+		_previous[i] = current
+
+
+func _solve_distances(alpha: float, reverse: bool) -> void:
+	var rest := _config.get_rest_length()
+	var count := _positions.size() - 1
+	for k in count:
+		var i := count - 1 - k if reverse else k
+		var w0 := _inverse_mass[i]
+		var w1 := _inverse_mass[i + 1]
+		var weight := w0 + w1
+		if weight == 0.0:
+			continue
+		var delta := _positions[i + 1] - _positions[i]
+		var distance := delta.length()
+		if distance < 1e-9:
+			continue
+		var d_lambda := (rest - distance - alpha * _lambdas[i]) / (weight + alpha)
+		_lambdas[i] += d_lambda
+		var correction := delta * (d_lambda / distance)
+		_positions[i] -= correction * w0
+		_positions[i + 1] += correction * w1

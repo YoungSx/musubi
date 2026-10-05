@@ -1,0 +1,33 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/rope/rope.gd" id="1_rope"]
+[ext_resource type="Resource" path="res://data/rope/default_rope.tres" id="2_config"]
+[ext_resource type="Script" path="res://scripts/rope/rope_renderer.gd" id="3_renderer"]
+[ext_resource type="Material" path="res://assets/materials/rope.tres" id="4_rope_material"]
+[ext_resource type="Material" path="res://assets/materials/anchor.tres" id="5_anchor_material"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_anchor"]
+radius = 0.022
+height = 0.044
+radial_segments = 24
+rings = 12
+
+[node name="Rope" type="Node3D" node_paths=PackedStringArray("start_anchor", "end_anchor")]
+script = ExtResource("1_rope")
+config = ExtResource("2_config")
+start_anchor = NodePath("StartAnchor")
+end_anchor = NodePath("EndAnchor")
+
+[node name="StartAnchor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.45, 0.32)
+mesh = SubResource("SphereMesh_anchor")
+surface_material_override/0 = ExtResource("5_anchor_material")
+
+[node name="EndAnchor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.45, 0.32)
+mesh = SubResource("SphereMesh_anchor")
+surface_material_override/0 = ExtResource("5_anchor_material")
+
+[node name="RopeRenderer" type="MeshInstance3D" parent="."]
+material_override = ExtResource("4_rope_material")
+script = ExtResource("3_renderer")
