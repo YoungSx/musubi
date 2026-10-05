@@ -11,9 +11,9 @@ config_version=5
 [application]
 
 config/name="Musubi"
-config/version="0.3.0"
+config/version="0.4.0"
 config/description="An interactive study of rope, form and connection."
-run/main_scene="res://scenes/main/main.tscn"
+run/main_scene="res://scenes/main/play.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 

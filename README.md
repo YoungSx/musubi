@@ -4,10 +4,26 @@ An interactive study of rope, form and connection.
 
 Godot 4.7.2 / GDScript prototype, validating Windows locally first while keeping
 the simulation and touch input portable. Open `project.godot`
-in Godot and run the main scene (F6 from `scenes/main/main.tscn`, or F5).
+in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
+The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: Windows creation prototype (0.3.0)
+## Current milestone: direct rope play on the mannequin (0.4.0)
+
+The default scene retains the full mannequin and its limb/torso collisions.
+An unpinned rope rests naturally across its shoulders. Grab any visible portion
+of the rope, move it and release: physics continues, with a brief local damping
+pulse rather than a frozen scene. Grabs address a continuous location between
+particles. During a grab, a second finger or right mouse drag can inspect the
+scene without dropping the rope or moving the world-space hand target.
+
+The default UI has one Menu entry. Rope settings, snapshots, undo/redo and pause
+controls remain available through Advanced; developer targets and endpoint labels
+are hidden in normal play. Saved workbench creations retain their old held-release
+behavior. This is the first interaction correction; automatic pass corridors,
+intent scoring and verified Overhand/Half Hitch play are not implemented yet.
+
+The capabilities below describe the shared core and advanced workbench:
 
 - Abstract mannequin and studio lighting.
 - One procedural tube mesh with rounded ends, suspended between two anchors.
@@ -21,7 +37,7 @@ No third-party dependencies are required.
   rope simulation and original anchor positions.
 - Grab visible rope segments with a finger or mouse. A soft positional
   constraint responds to the pointer while respecting attachments and contacts.
-  Release holds the current shape; grabbing again resumes simulation.
+  Workbench release holds the shape; Play release continues simulation.
 - Grab marker and contextual hints. A developer-only Debug toggle reveals
   rope particles, constraints, collision outlines, selection, FPS and timings.
 - Versioned JSON simulation snapshots preserve configuration, particles,
@@ -30,14 +46,14 @@ No third-party dependencies are required.
 Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
 and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
 pans, wheel zooms. Grab either dark endpoint to release that attachment;
-release keeps it free and holds the shape. The wheel moves the grabbed rope
+release keeps it free, with natural motion in Play and a held shape in Workbench. The wheel moves the grabbed rope
 toward/away from the camera during a drag. Esc restores the complete pre-grab
 shape and attachments; Reset restores both original attachments.
 
 Desktop: the rope highlights on hover. R resets the scene, F restores the view,
 Space pauses/resumes, Esc cancels a grab and restores its starting shape, and
 F11 toggles full screen. Mouse picking uses a tighter tolerance than touch.
-Gold marks the grabbed rope; blue marks its requested target, including when
+In Workbench, gold marks the grabbed rope; blue marks its requested target, including when
 occluded. Continue/Hold controls physics explicitly; B or Other side turns the
 camera around. The Rope menu creates 1.4/2.2/3.0 m ropes and fixes/releases A or B.
 Ctrl+Z undoes a rope edit, Ctrl+Shift+Z/Ctrl+Y redoes it. History includes grabs,
@@ -69,7 +85,7 @@ and double-click `Musubi.exe`, keeping `Musubi.pck` alongside it.
 | `scripts/interaction/`, `scripts/camera/` | Input gestures and camera intent |
 | `scripts/mannequin/`, `data/mannequin/` | Figure geometry and matching primitive collision shapes |
 
-The default rope uses 48 segments, a 1.4 m rest length, 120 Hz simulation,
+The legacy workbench rope uses 48 segments, a 1.4 m rest length, 120 Hz simulation,
 6 substeps and 2 constraint iterations per substep. Catch-up is bounded after
 frame hitches. The desktop window starts at 1280×800, resizes down to 960×640
 and adapts UI scale to display DPI. Mobile retains its portrait viewport.
@@ -99,7 +115,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 90 tests passed. A rendered scene smoke check exercised camera orbit,
+All 95 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -117,12 +133,14 @@ the Rope node's held/catch-up state are application data and are not included
 in this simulation snapshot. `MusubiSceneState` adds these fields for full
 creation files, validates before changing the live scene and replaces files
 only after a successful temporary-file write. Invalid files leave the scene intact.
-Simulation format v2 includes self-contact settings. Existing v1 creations load
+Simulation format v3 adds fractional grip and natural-release stabilization state;
+v1/v2 snapshots remain readable. Existing v1 creations load
 with self-contact disabled to preserve their behavior; Reset starts a new rope
 with the current default (enabled). Debug shows the active setting and last-pass
 contact count. See [self-contact implementation and verification](docs/rope-self-collision.md).
 See [Windows creation controls and acceptance](docs/windows-creation.md) for
 the complete authoring workflow, history behavior and measured limitations.
+For current play-mode behavior and evidence, see [mannequin interaction](docs/mannequin-play.md).
 
 ## Remaining validation and next milestone
 

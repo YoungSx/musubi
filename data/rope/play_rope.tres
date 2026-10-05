@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="RopeConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/rope/rope_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+length = 2.2
+segment_count = 72
+simulation_rate = 60
+substeps = 10
+drag_compliance = 0.00008
+damping = 4.0
+friction = 0.35

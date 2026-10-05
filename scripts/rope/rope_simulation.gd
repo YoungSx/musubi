@@ -18,6 +18,9 @@ var _last_substep := 0.0
 var _collision: RopeCollision
 var _self_collision := RopeSelfCollision.new()
 var _drag_index := -1
+var _drag_fraction := 0.0
+var _release_u := -1.0
+var _release_remaining := 0.0
 var _drag_target := Vector3.ZERO
 var _drag_lambda := Vector3.ZERO
 
@@ -45,6 +48,7 @@ func step(dt: float) -> void:
 	for substep in _config.substeps:
 		var start := _positions.duplicate() if _config.self_collision_enabled else PackedVector3Array()
 		_integrate(h)
+		_release_remaining = maxf(0.0, _release_remaining - h)
 		_lambdas.fill(0.0)
 		_drag_lambda = Vector3.ZERO
 		for iteration in _config.solver_iterations:
@@ -75,7 +79,7 @@ func get_self_contact_count() -> int:
 
 func capture_state() -> Dictionary:
 	return RopeState.encode(_config, _positions, _previous, _inverse_mass,
-		_last_substep, _drag_index, _drag_target)
+		_last_substep, _drag_index, _drag_target, _drag_fraction, _release_u, _release_remaining)
 
 
 static func restore_state(data: Dictionary) -> RopeSimulation:
@@ -88,15 +92,41 @@ static func restore_state(data: Dictionary) -> RopeSimulation:
 	simulation._last_substep = state.last_substep
 	simulation._drag_index = state.drag_index
 	simulation._drag_target = state.drag_target
+	simulation._drag_fraction = state.drag_fraction
+	simulation._release_u = state.release_u
+	simulation._release_remaining = state.release_remaining
 	return simulation
 
 
 func begin_drag(index: int) -> bool:
 	if index < 0 or index >= _positions.size() or is_pinned(index):
 		return false
+	return begin_grip(float(index) / float(_positions.size() - 1))
+
+
+func begin_grip(material_u: float) -> bool:
+	if not is_finite(material_u) or material_u < 0.0 or material_u > 1.0:
+		return false
+	var coordinate := material_u * float(_positions.size() - 1)
+	if absf(coordinate - roundf(coordinate)) < 1e-8:
+		coordinate = roundf(coordinate)
+	var index := floori(coordinate)
+	var fraction := coordinate - index
+	var other := mini(index + 1, _positions.size() - 1)
+	if _inverse_mass[index] * (1.0 - fraction) + _inverse_mass[other] * fraction <= 0.0:
+		return false
 	_drag_index = index
-	_drag_target = _positions[index]
+	_drag_fraction = fraction
+	_drag_target = get_grip_position()
+	_drag_lambda = Vector3.ZERO
+	_release_remaining = 0.0
 	return true
+
+
+func get_grip_position() -> Vector3:
+	if _drag_index < 0:
+		return Vector3.ZERO
+	return _positions[_drag_index].lerp(_positions[mini(_drag_index + 1, _positions.size() - 1)], _drag_fraction)
 
 
 func update_drag_target(target: Vector3) -> void:
@@ -107,13 +137,14 @@ func update_drag_target(target: Vector3) -> void:
 	for pass_index in 8:
 		for i in _positions.size():
 			if is_pinned(i):
-				var reach := absf(float(i - _drag_index)) * _config.get_rest_length()
+				var reach := absf(float(i - _drag_index) - _drag_fraction) * _config.get_rest_length()
 				target = _positions[i] + (target - _positions[i]).limit_length(reach)
 	_drag_target = target
 
 
 func end_drag() -> void:
 	_drag_index = -1
+	_drag_fraction = 0.0
 	_drag_lambda = Vector3.ZERO
 
 
@@ -128,17 +159,38 @@ func get_drag_target() -> Vector3:
 func stop_motion() -> void:
 	_previous = _positions.duplicate()
 	_last_substep = 0.0
+	_release_remaining = 0.0
+
+
+## Natural release: only the gripped neighborhood gets a brief damping pulse.
+## Distant particles keep moving; collision and length constraints remain active.
+func release_grip() -> void:
+	if _drag_index < 0:
+		return
+	_release_u = (float(_drag_index) + _drag_fraction) / float(_positions.size() - 1)
+	_release_remaining = 0.12
+	for i in range(maxi(0, _drag_index - 3), mini(_positions.size(), _drag_index + 5)):
+		if _inverse_mass[i] > 0.0 and _last_substep > 0.0:
+			_previous[i] = _positions[i] - (_positions[i] - _previous[i]).limit_length(0.8 * _last_substep)
+	end_drag()
 
 
 func _solve_drag(dt: float) -> void:
 	if _drag_index < 0:
 		return
 	var alpha := _config.drag_compliance / (dt * dt)
-	var current := _positions[_drag_index]
-	var correction := (_drag_target - current - _drag_lambda * alpha) / (1.0 + alpha)
-	correction = correction.limit_length(_config.drag_speed * dt)
+	var other := mini(_drag_index + 1, _positions.size() - 1)
+	var a := 1.0 - _drag_fraction
+	var b := _drag_fraction
+	var weight := a * a * _inverse_mass[_drag_index] + b * b * _inverse_mass[other]
+	if weight <= 0.0:
+		return
+	var current := get_grip_position()
+	var correction := (_drag_target - current - _drag_lambda * alpha) / (weight + alpha)
+	correction = correction.limit_length(_config.drag_speed * dt / weight)
 	_drag_lambda += correction
-	_positions[_drag_index] = current + correction
+	_positions[_drag_index] += correction * a * _inverse_mass[_drag_index]
+	_positions[other] += correction * b * _inverse_mass[other]
 
 
 ## Pins a particle at a world position. Moving a pinned particle is how
@@ -201,7 +253,11 @@ func _integrate(dt: float) -> void:
 		if _inverse_mass[i] == 0.0:
 			_previous[i] = current
 			continue
-		var predicted := current + (current - _previous[i]) * retain + gravity_step
+		var local_retain := retain
+		if _release_remaining > 0.0:
+			var distance := absf(float(i) - _release_u * float(_positions.size() - 1))
+			local_retain *= exp(-12.0 * dt * clampf(1.0 - distance / 4.0, 0.0, 1.0) * (_release_remaining / 0.12))
+		var predicted := current + (current - _previous[i]) * local_retain + gravity_step
 		_positions[i] = predicted
 		_previous[i] = current
 		if _collision != null:

@@ -5,6 +5,7 @@ extends Node3D
 var _rope: Rope
 var _hud: Hud
 var _enabled := false
+var play_mode := false
 var _stats_time := 0.0
 var _hint := ""
 var _hover_index := -1
@@ -39,6 +40,7 @@ func configure(rope: Rope, mannequin: Mannequin, hud: Hud) -> void:
 	var marker_material := StandardMaterial3D.new()
 	marker_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	marker_material.albedo_color = Color("efc98b")
+	marker_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_marker.material_override = marker_material
 	_marker.visible = false
 	add_child(_marker)
@@ -100,19 +102,28 @@ func _process(delta: float) -> void:
 	_hud.set_simulation_state(_rope.is_held(), selected >= 0)
 	_hud.set_rope_state(_rope.config.length, _rope.is_start_attached(), _rope.is_end_attached())
 	for side in 2:
+		_end_labels[side].visible = not play_mode or _enabled
 		_end_labels[side].global_position = sim.get_point(0 if side == 0 else sim.get_point_count() - 1) + Vector3.UP * 0.05
-	_target_marker.visible = selected >= 0
+	_target_marker.visible = selected >= 0 and (not play_mode or _enabled)
+	_target_line_node.visible = not play_mode or _enabled
 	_target_lines.clear_surfaces()
 	if selected >= 0:
 		_target_marker.global_position = sim.get_drag_target()
 		_target_lines.surface_begin(Mesh.PRIMITIVE_LINES)
-		_line(_target_lines, sim.get_point(selected), sim.get_drag_target(), Color("79cbd1"))
+		_line(_target_lines, sim.get_grip_position(), sim.get_drag_target(), Color("79cbd1"))
 		_target_lines.surface_end()
 	var marker_index := selected if selected >= 0 else _hover_index
 	_marker.visible = marker_index >= 0 and marker_index < sim.get_point_count()
 	if _marker.visible:
-		_marker.global_position = sim.get_point(marker_index)
+		_marker.global_position = sim.get_grip_position() if selected >= 0 else sim.get_point(marker_index)
 		_marker.scale = Vector3.ONE * (1.0 if selected >= 0 else 0.6)
+		var camera := get_viewport().get_camera_3d()
+		var occluded := false
+		if play_mode and selected >= 0 and camera != null:
+			occluded = not RopeVisibility.is_visible(camera.project_ray_origin(camera.unproject_position(_marker.global_position)), _marker.global_position, _rope.get_collision())
+		var material := _marker.material_override as StandardMaterial3D
+		material.no_depth_test = occluded
+		material.albedo_color = Color(0.94, 0.79, 0.55, 0.55 if occluded else 1.0)
 	var hint := "Drag rope · Drag space to orbit"
 	if _rope.is_held():
 		hint = "Shape held · Grab to continue"
@@ -132,7 +143,7 @@ func _process(delta: float) -> void:
 		if i > 0:
 			_line(_lines, sim.get_point(i - 1), point, Color("62bfa4"))
 	if selected >= 0:
-		_line(_lines, sim.get_point(selected), sim.get_drag_target(), Color.YELLOW)
+		_line(_lines, sim.get_grip_position(), sim.get_drag_target(), Color.YELLOW)
 	_lines.surface_end()
 	_stats_time -= delta
 	if _stats_time <= 0.0:

@@ -11,6 +11,9 @@ extends Node3D
 @export var config: RopeConfig
 @export var start_anchor: Node3D
 @export var end_anchor: Node3D
+enum InitialLayout { HANGING, DRAPED }
+@export var initial_layout: InitialLayout = InitialLayout.HANGING
+@export var hold_on_release := true
 signal edit_completed(before: Dictionary, after: Dictionary)
 
 var _simulation: RopeSimulation
@@ -71,11 +74,13 @@ func reset() -> void:
 		start_anchor.global_position = _initial_start_position
 	if end_anchor != null:
 		end_anchor.global_position = _initial_end_position
-	_start_attached = start_anchor != null
-	_end_attached = end_anchor != null
+	_start_attached = start_anchor != null and initial_layout == InitialLayout.HANGING
+	_end_attached = end_anchor != null and initial_layout == InitialLayout.HANGING
 	var start := _anchor_position(start_anchor, global_position)
 	var end := _anchor_position(end_anchor, start + Vector3.DOWN * config.length)
 	var points := RopeLayout.hanging(start, end, config.length, config.segment_count)
+	if initial_layout == InitialLayout.DRAPED:
+		points = RopeLayout.shoulder_drape(config.length, config.segment_count)
 	_simulation = RopeSimulation.new(config, points)
 	_simulation.set_collision(_collision)
 	_accumulator = 0.0
@@ -104,6 +109,10 @@ func new_rope(length_m: float) -> bool:
 	if preset == null or _simulation.get_drag_index() >= 0:
 		return false
 	config = preset
+	if initial_layout == InitialLayout.DRAPED:
+		config.drag_compliance = 0.00008
+		config.damping = 4.0
+		config.friction = 0.35
 	reset()
 	return true
 
@@ -134,14 +143,20 @@ func set_endpoint_attached(side: int, attached: bool) -> bool:
 func begin_drag(index: int) -> bool:
 	if _simulation.get_drag_index() >= 0 or not can_drag(index):
 		return false
+	return begin_grip(float(index) / float(_simulation.get_point_count() - 1))
+
+
+func begin_grip(material_u: float) -> bool:
+	if _simulation.get_drag_index() >= 0 or not is_finite(material_u) or material_u < 0 or material_u > 1:
+		return false
 	var before := capture_scene_state()
-	if index == 0 and _start_attached:
+	if material_u == 0.0 and _start_attached:
 		_start_attached = false
-		_simulation.unpin(index)
-	if index == _simulation.get_point_count() - 1 and _end_attached:
+		_simulation.unpin(0)
+	if material_u == 1.0 and _end_attached:
 		_end_attached = false
-		_simulation.unpin(index)
-	if not _simulation.begin_drag(index):
+		_simulation.unpin(_simulation.get_point_count() - 1)
+	if not _simulation.begin_grip(material_u):
 		restore_scene_state(before)
 		return false
 	_drag_snapshot = before
@@ -158,10 +173,13 @@ func end_drag() -> void:
 	if _simulation.get_drag_index() < 0:
 		return
 	var before := _drag_snapshot.duplicate(true)
-	_simulation.end_drag()
+	if hold_on_release:
+		_simulation.end_drag()
+		_simulation.stop_motion()
+	else:
+		_simulation.release_grip()
 	_drag_snapshot.clear()
-	_simulation.stop_motion()
-	_held = true
+	_held = hold_on_release
 	_accumulator = 0.0
 	_refresh_mesh()
 	edit_completed.emit(before, capture_scene_state())
@@ -202,6 +220,7 @@ func capture_scene_state() -> Dictionary:
 	if _simulation.get_drag_index() >= 0:
 		return {}
 	return {"simulation": _simulation.capture_state(), "held": _held,
+		"initial_layout": int(initial_layout), "hold_on_release": hold_on_release,
 		"accumulator": _accumulator, "start_attached": _start_attached,
 		"end_attached": _end_attached, "start_anchor": _encode_anchor(start_anchor),
 		"end_anchor": _encode_anchor(end_anchor)}
@@ -209,6 +228,9 @@ func capture_scene_state() -> Dictionary:
 
 ## Validate the whole payload before touching live nodes or simulation state.
 func validate_scene_state(data: Dictionary) -> bool:
+	var layout: Variant = data.get("initial_layout", 0)
+	if not (layout is int or layout is float) or (layout != 0 and layout != 1) or not data.get("hold_on_release", true) is bool:
+		return false
 	if not data.get("simulation") is Dictionary or not data.get("held") is bool:
 		return false
 	if not data.get("start_attached") is bool or not data.get("end_attached") is bool:
@@ -247,6 +269,8 @@ func restore_scene_state(data: Dictionary) -> bool:
 	if restored == null:
 		return false
 	_simulation = restored
+	initial_layout = int(data.get("initial_layout", 0))
+	hold_on_release = data.get("hold_on_release", true)
 	config = RopeState.decode(data.simulation).config
 	_simulation.set_collision(_collision)
 	_held = data.held

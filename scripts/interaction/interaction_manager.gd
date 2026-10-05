@@ -15,6 +15,7 @@ var _gestures := GestureTracker.new()
 var _rope_interaction := RopeInteraction.new()
 var _hover_index := -1
 var _hover_time := 0.0
+var _inspecting := false
 
 
 func _ready() -> void:
@@ -27,6 +28,17 @@ func _ready() -> void:
 	_gestures.primary_cancelled.connect(_on_primary_ended)
 	_gestures.secondary_drag.connect(_on_secondary_drag)
 	_gestures.zoom.connect(_on_zoom)
+	_gestures.inspection_started.connect(func(): _inspecting = get_selected_index() >= 0)
+	_gestures.inspection_ended.connect(_on_inspection_ended)
+
+
+func set_play_mode(enabled: bool) -> void:
+	_gestures.preserve_grip_during_inspection = enabled
+
+
+func _on_inspection_ended(position: Vector2) -> void:
+	_inspecting = false
+	_rope_interaction.rebase(position)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -102,15 +114,19 @@ func _on_primary_drag(position: Vector2, relative: Vector2) -> void:
 
 
 func _on_primary_ended() -> void:
+	_inspecting = false
 	_rope_interaction.end()
 
 
 func _on_secondary_drag(relative: Vector2) -> void:
-	camera_rig.pan(_to_screen_units(relative))
+	if _inspecting:
+		camera_rig.orbit(_to_screen_units(relative))
+	else:
+		camera_rig.pan(_to_screen_units(relative))
 
 
 func _on_zoom(factor: float) -> void:
-	if _rope_interaction.get_selected_index() >= 0:
+	if _rope_interaction.get_selected_index() >= 0 and not _inspecting:
 		_rope_interaction.adjust_depth(factor)
 	else:
 		camera_rig.zoom(factor)

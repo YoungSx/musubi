@@ -14,6 +14,8 @@ var _drag_origin := Vector3.ZERO
 var _drag_depth := 0.0
 var _min_depth := 0.1
 var _max_depth := 10.0
+var _picked_u := 0.0
+var _camera_reference := Transform3D.IDENTITY
 
 
 func configure(rope: Rope, camera: Camera3D) -> void:
@@ -29,10 +31,12 @@ func begin(screen_position: Vector2) -> bool:
 	var index := _pick(screen_position)
 	if index < 0:
 		return false
-	var point := _rope.get_simulation().get_point(index)
+	var coordinate := _picked_u * (_rope.get_simulation().get_point_count() - 1)
+	var base := floori(coordinate)
+	var point := _rope.get_simulation().get_point(base).lerp(_rope.get_simulation().get_point(mini(base + 1, _rope.get_simulation().get_point_count() - 1)), coordinate - base)
 	_drag_plane = Plane(_camera.global_basis.z.normalized(), point)
 	var intersection: Variant = _project_on_plane(screen_position)
-	if intersection == null or not _rope.begin_drag(index):
+	if intersection == null or not _rope.begin_grip(_picked_u):
 		return false
 	_selected_index = index
 	_grab_offset = point - (intersection as Vector3)
@@ -41,16 +45,38 @@ func begin(screen_position: Vector2) -> bool:
 	_drag_depth = _drag_plane.normal.dot(_drag_origin - point)
 	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
 	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
+	_camera_reference = _camera.global_transform
 	return true
 
 
 func move(screen_position: Vector2) -> void:
 	if _selected_index < 0:
 		return
+	if not _camera_reference.is_equal_approx(_camera.global_transform):
+		rebase(_last_screen_position)
 	_last_screen_position = screen_position
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection != null:
 		_rope.update_drag_target((intersection as Vector3) + _grab_offset)
+
+
+## A camera move must not be interpreted as a hand move. Keep the requested
+## world position, then rebuild the pointer offset in the new view.
+func rebase(screen_position: Vector2) -> void:
+	if _selected_index < 0:
+		return
+	var target := _rope.get_simulation().get_drag_target()
+	_drag_plane = Plane(_camera.global_basis.z.normalized(), target)
+	var intersection: Variant = _project_on_plane(screen_position)
+	if intersection == null:
+		return
+	_grab_offset = target - (intersection as Vector3)
+	_last_screen_position = screen_position
+	_drag_origin = _camera.global_position
+	_drag_depth = _drag_plane.normal.dot(_drag_origin - target)
+	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
+	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
+	_camera_reference = _camera.global_transform
 
 
 ## Wheel-up moves the active plane toward the viewer. Reachability and soft
@@ -58,6 +84,8 @@ func move(screen_position: Vector2) -> void:
 func adjust_depth(factor: float) -> void:
 	if _selected_index < 0 or not is_finite(factor) or factor <= 0.0:
 		return
+	if not _camera_reference.is_equal_approx(_camera.global_transform):
+		rebase(_last_screen_position)
 	_drag_depth = clampf(_drag_depth / factor, _min_depth, _max_depth)
 	_drag_plane = Plane(_drag_plane.normal, _drag_origin - _drag_plane.normal * _drag_depth)
 	move(_last_screen_position)
@@ -116,6 +144,12 @@ func _pick(screen_position: Vector2) -> int:
 		if not _is_visible(candidate) or not _is_visible(points[index]):
 			continue
 		selected = index
+		_picked_u = (float(i) + t) / float(points.size() - 1)
+		# End caps remain easy to pick without snapping every interior grip to a node.
+		if index == 0 and screen_position.distance_squared_to(a) < pick_radius_pixels * pick_radius_pixels * 0.25:
+			_picked_u = 0.0
+		elif index == points.size() - 1 and screen_position.distance_squared_to(b) < pick_radius_pixels * pick_radius_pixels * 0.25:
+			_picked_u = 1.0
 		best_distance = distance
 		best_depth = depth
 	return selected
@@ -125,21 +159,5 @@ func _pick(screen_position: Vector2) -> int:
 ## physics-server query from an input callback. Trace toward the candidate,
 ## not the finger's center: the generous touch radius can be beside the rope.
 func _is_visible(point: Vector3) -> bool:
-	var collision := _rope.get_collision()
-	if collision == null:
-		return true
 	var origin := _camera.project_ray_origin(_camera.unproject_position(point))
-	var delta := point - origin
-	var length := delta.length()
-	if length <= 0.0001:
-		return true
-	var direction := delta / length
-	var travelled := 0.0
-	for step_index in 128:
-		if travelled >= length:
-			return true
-		var clearance := collision.get_clearance(origin + direction * travelled)
-		if clearance < 0.0001:
-			return false
-		travelled += maxf(clearance * 0.8, 0.0001)
-	return false
+	return RopeVisibility.is_visible(origin, point, _rope.get_collision())

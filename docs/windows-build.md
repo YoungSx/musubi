@@ -1,6 +1,6 @@
 # Windows 本地测试包
 
-Musubi 0.3.0 使用 Godot 4.7.2 stable 的 Windows x64 导出模板。
+Musubi 0.4.0 使用 Godot 4.7.2 stable 的 Windows x64 导出模板。
 测试者解压 ZIP 后双击 `Musubi.exe` 即可运行；`Musubi.pck` 必须与它放在一起。
 目标电脑无需安装 Godot。当前包用于本地试玩，尚未做代码签名。
 

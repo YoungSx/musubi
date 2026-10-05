@@ -15,6 +15,8 @@ signal new_rope_requested(length_m: float)
 
 var _base_margins: Dictionary[StringName, int] = {}
 var _file_dialog: FileDialog
+var _play_mode := false
+var _advanced_visible := true
 
 
 func _ready() -> void:
@@ -35,6 +37,15 @@ func _ready() -> void:
 	menu.add_item("Release A", 10)
 	menu.add_item("Release B", 11)
 	menu.id_pressed.connect(_rope_menu_selected)
+	var play_menu: PopupMenu = %PlayMenu.get_popup()
+	play_menu.add_item("Start again", 0)
+	play_menu.add_item("Save", 1)
+	play_menu.add_item("Open", 2)
+	play_menu.add_separator()
+	play_menu.add_item("Advanced", 3)
+	if OS.is_debug_build():
+		play_menu.add_item("Debug", 4)
+	play_menu.id_pressed.connect(func(id: int): action_requested.emit([&"reset", &"save", &"load", &"advanced", &"debug"][id]))
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
 		_base_margins[side] = _safe_area.get_theme_constant(side)
 	get_viewport().size_changed.connect(_apply_safe_area)
@@ -53,6 +64,27 @@ func set_interaction_hint(text: String) -> void:
 func set_status(text: String) -> void:
 	%Status.text = text
 	%Status.tooltip_text = text
+	if _play_mode:
+		%Status.visible = not text.is_empty()
+
+
+func set_play_mode(enabled: bool) -> void:
+	if enabled != _play_mode:
+		_play_mode = enabled
+		set_advanced_visible(not enabled)
+	%PlayMenu.visible = enabled
+
+
+func is_advanced_visible() -> bool:
+	return _advanced_visible
+
+
+func set_advanced_visible(enabled: bool) -> void:
+	_advanced_visible = enabled
+	for path in ["SafeArea/Layout/RopeControls", "SafeArea/Layout/Actions", "SafeArea/Layout/Shortcuts"]:
+		get_node(path).visible = enabled
+	%InteractionHint.visible = enabled
+	%Status.visible = enabled or not %Status.text.is_empty()
 
 
 func set_simulation_state(held: bool, dragging: bool) -> void:

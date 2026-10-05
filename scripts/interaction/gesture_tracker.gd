@@ -16,6 +16,9 @@ signal primary_ended
 signal primary_cancelled
 signal secondary_drag(relative: Vector2)
 signal zoom(factor: float)
+signal inspection_started
+signal inspection_ended(position: Vector2)
+var preserve_grip_during_inspection := false
 
 ## Touch indices are >= 0, so the mouse pointer can never collide with a finger.
 const MOUSE_POINTER := -1
@@ -26,6 +29,8 @@ const MIN_PINCH_SPREAD := 1.0
 var _pointers: Dictionary[int, Vector2] = {}
 var _mouse_secondary_held := false
 var _primary_active := false
+var _primary_id := -2
+var _inspecting := false
 
 
 ## Returns true when the event was consumed as part of a gesture.
@@ -96,7 +101,14 @@ func _handle_mouse_button(event: InputEventMouseButton) -> bool:
 			return _release_pointer(MOUSE_POINTER)
 		MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
 			if event.pressed:
-				_cancel_primary()
+				if preserve_grip_during_inspection and _primary_active:
+					_inspecting = true
+					inspection_started.emit()
+				else:
+					_cancel_primary()
+			elif _inspecting:
+				_inspecting = false
+				inspection_ended.emit(_pointers.get(_primary_id, event.position))
 			_mouse_secondary_held = event.pressed
 			return true
 		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
@@ -126,7 +138,11 @@ func _press_pointer(index: int, position: Vector2) -> bool:
 	_pointers[index] = position
 	if first:
 		_primary_active = true
+		_primary_id = index
 		primary_started.emit(position)
+	elif preserve_grip_during_inspection and _primary_active and _pointers.size() == 2:
+		_inspecting = true
+		inspection_started.emit()
 	else:
 		_cancel_primary()
 	return true
@@ -135,6 +151,11 @@ func _press_pointer(index: int, position: Vector2) -> bool:
 func _release_pointer(index: int) -> bool:
 	if not _pointers.erase(index):
 		return false
+	if _inspecting:
+		_inspecting = false
+		inspection_ended.emit(_pointers.get(_primary_id, Vector2.ZERO))
+		if index != _primary_id:
+			return true
 	if _primary_active:
 		_primary_active = false
 		primary_ended.emit()
@@ -142,6 +163,9 @@ func _release_pointer(index: int) -> bool:
 
 
 func _cancel_primary() -> void:
+	if _inspecting:
+		_inspecting = false
+		inspection_ended.emit(_pointers.get(_primary_id, Vector2.ZERO))
 	if _primary_active:
 		_primary_active = false
 		primary_cancelled.emit()

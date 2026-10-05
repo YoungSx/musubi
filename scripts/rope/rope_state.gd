@@ -3,7 +3,7 @@ extends RefCounted
 ## Versioned JSON data only. Scene transforms and collision configuration are
 ## owned by the application and must be reattached after restoring a simulation.
 
-const VERSION := 2
+const VERSION := 3
 const CONFIG_RANGES := {
 	"length": Vector2(0.1, 10.0), "segment_count": Vector2(2, 256),
 	"radius": Vector2(0.002, 0.05), "damping": Vector2(0, 20),
@@ -17,7 +17,8 @@ const CONFIG_RANGES := {
 
 
 static func encode(config: RopeConfig, positions: PackedVector3Array, previous: PackedVector3Array,
-		masses: PackedFloat32Array, last_substep: float, drag_index: int, target: Vector3) -> Dictionary:
+		masses: PackedFloat32Array, last_substep: float, drag_index: int, target: Vector3,
+		drag_fraction := 0.0, release_u := -1.0, release_remaining := 0.0) -> Dictionary:
 	var parameters := {}
 	for key in CONFIG_RANGES:
 		parameters[key] = config.get(key)
@@ -30,12 +31,13 @@ static func encode(config: RopeConfig, positions: PackedVector3Array, previous: 
 		history.append(_vector(previous[i]))
 	return {"version": VERSION, "config": parameters, "positions": points,
 		"previous": history, "inverse_mass": Array(masses), "last_substep": last_substep,
-		"drag_index": drag_index, "drag_target": _vector(target)}
+		"drag_index": drag_index, "drag_target": _vector(target), "drag_fraction": drag_fraction,
+		"release_u": release_u, "release_remaining": release_remaining}
 
 
 ## Validate before allocating a simulation; malformed payloads return empty.
 static func decode(data: Dictionary) -> Dictionary:
-	if not _number(data.get("version")) or (data.version != 1 and data.version != VERSION):
+	if not _number(data.get("version")) or data.version < 1 or data.version > VERSION or data.version != floor(data.version):
 		return {}
 	if not data.get("config") is Dictionary:
 		return {}
@@ -80,11 +82,21 @@ static func decode(data: Dictionary) -> Dictionary:
 		positions.append(_read_vector(data.positions[i]))
 		previous.append(_read_vector(data.previous[i]))
 		masses.append(mass)
-	if drag >= 0 and masses[int(drag)] == 0.0:
+	var fraction: Variant = data.get("drag_fraction", 0.0 if data.version < 3 else null)
+	var release_u: Variant = data.get("release_u", -1.0 if data.version < 3 else null)
+	var release_remaining: Variant = data.get("release_remaining", 0.0 if data.version < 3 else null)
+	if not _number(fraction) or fraction < 0 or fraction >= 1 or ((drag < 0 or drag == count - 1) and fraction != 0):
+		return {}
+	if not _number(release_u) or release_u < -1 or release_u > 1 or not _number(release_remaining) or release_remaining < 0 or release_remaining > 0.12:
+		return {}
+	if release_remaining > 0 and release_u < 0:
+		return {}
+	if drag >= 0 and masses[int(drag)] * (1.0 - fraction) + masses[mini(int(drag) + 1, count - 1)] * fraction <= 0.0:
 		return {}
 	return {"config": config, "positions": positions, "previous": previous,
 		"inverse_mass": masses, "last_substep": float(data.last_substep),
-		"drag_index": int(drag), "drag_target": _read_vector(data.drag_target)}
+		"drag_index": int(drag), "drag_target": _read_vector(data.drag_target), "drag_fraction": float(fraction),
+		"release_u": float(release_u), "release_remaining": float(release_remaining)}
 
 
 static func _number(value: Variant) -> bool:

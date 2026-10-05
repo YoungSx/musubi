@@ -75,6 +75,18 @@ static func polyline_length(points: PackedVector3Array) -> float:
 	return total
 
 
+static func shoulder_drape(length: float, segment_count: int) -> PackedVector3Array:
+	var arch := PackedVector3Array([
+		Vector3(-0.30, 1.15, 0.1), Vector3(-0.23, 1.48, 0.03),
+		Vector3(-0.1, 1.48, -0.08), Vector3(0, 1.48, -0.09),
+		Vector3(0.1, 1.48, -0.08), Vector3(0.23, 1.48, 0.03), Vector3(0.30, 1.15, 0.1)])
+	var tail := maxf((length - polyline_length(arch)) * 0.5, 0.02)
+	var points := PackedVector3Array([arch[0] + Vector3.DOWN * tail])
+	points.append_array(arch)
+	points.append(arch[-1] + Vector3.DOWN * tail)
+	return resample(points, segment_count)
+
+
 static func _parabola(a: Vector3, span: Vector3, sag_dir: Vector3, depth: float) -> PackedVector3Array:
 	var points := PackedVector3Array()
 	points.resize(_FINE_SAMPLES + 1)

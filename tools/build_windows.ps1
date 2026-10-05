@@ -120,7 +120,9 @@ No Godot editor installation is required on the test computer.
 
 Left drag: shape rope or orbit empty space. Right/middle drag: pan.
 Wheel: zoom, or move the grabbed rope in depth. Grab an endpoint to free it.
-Release: hold shape. Esc: cancel grab. R: reset. F: restore view.
+Release: natural motion in Play; hold shape in the legacy Workbench.
+While grabbing in Play, hold right mouse to inspect without dropping the rope.
+Menu > Advanced exposes workbench controls. Esc: cancel grab. R: reset. F: view.
 Space: pause/resume. F11: full screen. Ctrl+S / Ctrl+O: save/open creation.
 B: other side. Rope menu: new length or fix/release A/B.
 Ctrl+Z: undo. Ctrl+Shift+Z / Ctrl+Y: redo. Loading clears edit history.

@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/main/main.tscn" id="1"]
+[ext_resource type="Resource" path="res://data/rope/play_rope.tres" id="3"]
+
+[node name="Play" instance=ExtResource("1")]
+play_mode = true
+
+[node name="Rope" parent="." index="2"]
+config = ExtResource("3")
+initial_layout = 1
+hold_on_release = false

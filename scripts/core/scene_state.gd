@@ -5,6 +5,7 @@ extends RefCounted
 
 const VERSION := 1
 const MAX_FILE_BYTES := 4 * 1024 * 1024
+const OBSTACLE_PRESETS := ["res://data/mannequin/default_mannequin.tres"]
 
 
 static func capture(app: Node) -> Dictionary:
@@ -33,8 +34,7 @@ static func validate(app: Node, data: Dictionary) -> bool:
 	if not app.rope.validate_scene_state(data.rope) or not app.camera_rig.validate_state(data.camera):
 		return false
 	var mannequin: Dictionary = data.mannequin
-	var config_path: String = app.mannequin.config.resource_path
-	if config_path.is_empty() or mannequin.get("config_path") != config_path:
+	if mannequin.get("config_path") not in OBSTACLE_PRESETS:
 		return false
 	if not _valid_vector(mannequin.get("origin")):
 		return false
@@ -58,11 +58,14 @@ static func apply(app: Node, data: Dictionary) -> bool:
 		return false
 	# Cancel captured pointers only after the complete snapshot is accepted.
 	app.interaction_manager.reset()
+	if app.mannequin.config.resource_path != data.mannequin.config_path:
+		app.mannequin.config = load(data.mannequin.config_path) as MannequinConfig
 	app.mannequin.global_transform = _decode_transform(data.mannequin)
 	var collision := RopeCollision.new()
 	collision.configure(app.mannequin.config, app.mannequin.global_transform)
 	app.rope.set_collision(collision)
 	app.rope.restore_scene_state(data.rope)
+	app.set_play_mode(app.rope.initial_layout == Rope.InitialLayout.DRAPED)
 	app.camera_rig.restore_state(data.camera)
 	return true
 

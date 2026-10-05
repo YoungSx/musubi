@@ -90,7 +90,7 @@ func test_state_version_and_self_collision_options() -> void:
 	var config := RopeConfig.new()
 	var sim := RopeSimulation.new(config, RopeLayout.hanging(Vector3.ZERO, Vector3.RIGHT, config.length, config.segment_count))
 	var state := sim.capture_state()
-	assert_eq(state.version, 2, "new format records self contact settings")
+	assert_eq(state.version, 3, "new format records contact and continuous grip settings")
 	assert_true(RopeSimulation.restore_state(state).capture_state().config.self_collision_enabled, "new files enable self collision")
 	var old := state.duplicate(true)
 	old.version = 1

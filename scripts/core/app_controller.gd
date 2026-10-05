@@ -10,6 +10,7 @@ extends Node3D
 @export var interaction_manager: InteractionManager
 @export var hud: Hud
 @export var rope_debug: RopeDebug
+@export var play_mode := false
 
 var _last_creation_path := ""
 var history := RopeHistory.new()
@@ -30,10 +31,15 @@ func _ready() -> void:
 	$PerformanceCapture.rope = rope
 	rope.edit_completed.connect(_record_edit)
 	_refresh_history_controls()
+	set_play_mode(play_mode)
 
 
 func handle_action(action: StringName) -> void:
 	match action:
+		&"advanced":
+			hud.set_advanced_visible(not hud.is_advanced_visible())
+		&"debug":
+			rope_debug.set_debug_enabled(not rope_debug.is_debug_enabled())
 		&"reset": reset()
 		&"focus": camera_rig.reset_view()
 		&"back":
@@ -148,3 +154,10 @@ func _configure_collision() -> void:
 	var collision := RopeCollision.new()
 	collision.configure(mannequin.config, mannequin.global_transform)
 	rope.set_collision(collision)
+
+
+func set_play_mode(enabled: bool) -> void:
+	play_mode = enabled
+	hud.set_play_mode(enabled)
+	rope_debug.play_mode = enabled
+	interaction_manager.set_play_mode(enabled)
