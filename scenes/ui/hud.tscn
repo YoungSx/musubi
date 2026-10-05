@@ -39,10 +39,42 @@ layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="ResetButton" type="Button" parent="SafeArea/Layout"]
+[node name="InteractionHint" type="Label" parent="SafeArea/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SubtitleLabel"
+text = "Drag rope · Drag space to orbit"
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="Actions" type="HBoxContainer" parent="SafeArea/Layout"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+mouse_filter = 2
+
+[node name="ResetButton" type="Button" parent="SafeArea/Layout/Actions"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 44)
 layout_mode = 2
 size_flags_horizontal = 4
 focus_mode = 0
 text = "Reset"
+
+[node name="DebugButton" type="Button" parent="SafeArea/Layout/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 44)
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+text = "Debug"
+
+[node name="Diagnostics" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+offset_left = 24.0
+offset_top = 100.0
+offset_right = 365.0
+offset_bottom = 170.0
+theme_type_variation = &"SubtitleLabel"
+mouse_filter = 2

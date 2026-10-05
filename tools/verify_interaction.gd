@@ -59,6 +59,13 @@ func _run() -> void:
 	_check(not app.rope.is_held(), "real Reset button resumes simulation")
 	_check(app.rope.get_simulation().get_drag_index() == -1, "Reset clears selection")
 	await _capture("reset")
+	var debug_button := app.hud.get_node("%DebugButton") as Button
+	var debug_position := debug_button.get_global_rect().get_center()
+	_button(debug_position, true)
+	_button(debug_position, false)
+	await _frames(20)
+	_check(app.rope_debug.is_debug_enabled(), "real Debug button shows diagnostics")
+	await _capture("debug")
 	print("Rendered interaction smoke: %d failures" % failures)
 	quit(1 if failures else 0)
 

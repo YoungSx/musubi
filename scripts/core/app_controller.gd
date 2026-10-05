@@ -9,12 +9,15 @@ extends Node3D
 @export var rope: Rope
 @export var interaction_manager: InteractionManager
 @export var hud: Hud
+@export var rope_debug: RopeDebug
 
 
 func _ready() -> void:
 	assert(camera_rig and mannequin and rope and interaction_manager and hud, "AppController is missing a module reference.")
 	hud.reset_requested.connect(reset)
 	_configure_collision()
+	rope_debug.configure(rope, mannequin, hud)
+	hud.debug_toggled.connect(rope_debug.set_debug_enabled)
 
 
 ## Returns every module to its initial state.

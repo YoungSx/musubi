@@ -6,7 +6,7 @@ Godot 4.7.2 / GDScript prototype, targeting iOS first. Open `project.godot`
 in Godot and run the main scene (F6 from `scenes/main/main.tscn`, or F5).
 No third-party dependencies are required.
 
-## Current milestone: touch and mouse rope interaction
+## Current milestone: interactive prototype with diagnostics
 
 - Abstract mannequin and studio lighting.
 - One procedural tube mesh with rounded ends, suspended between two anchors.
@@ -19,6 +19,8 @@ No third-party dependencies are required.
 - Grab visible rope segments with a finger or mouse. A soft positional
   constraint responds to the pointer while respecting attachments and contacts.
   Release holds the current shape; grabbing again resumes simulation.
+- Grab marker and contextual hints. A developer-only Debug toggle reveals
+  rope particles, constraints, collision outlines, selection, FPS and timings.
 
 Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
 and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
@@ -59,10 +61,11 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 49 tests passed. A rendered scene smoke check exercised camera orbit,
+All 50 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
+It also clicks Debug and captures the diagnostic overlay.
 This checks scene integration, not physical touchscreen input. Tests cover
 two-finger transitions, cancellation, focus loss and occluded picking.
 

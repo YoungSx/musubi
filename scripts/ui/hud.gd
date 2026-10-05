@@ -4,6 +4,7 @@ extends CanvasLayer
 ## the camera, mannequin or simulation directly.
 
 signal reset_requested
+signal debug_toggled(enabled: bool)
 
 @onready var _reset_button: Button = %ResetButton
 @onready var _safe_area: MarginContainer = %SafeArea
@@ -13,10 +14,21 @@ var _base_margins: Dictionary[StringName, int] = {}
 
 func _ready() -> void:
 	_reset_button.pressed.connect(reset_requested.emit)
+	%DebugButton.visible = OS.is_debug_build()
+	%DebugButton.toggled.connect(debug_toggled.emit)
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
 		_base_margins[side] = _safe_area.get_theme_constant(side)
 	get_viewport().size_changed.connect(_apply_safe_area)
 	_apply_safe_area()
+
+
+func set_diagnostics(text: String) -> void:
+	%Diagnostics.text = text
+	%Diagnostics.visible = not text.is_empty()
+
+
+func set_interaction_hint(text: String) -> void:
+	%InteractionHint.text = text
 
 
 ## Keeps the UI clear of notches and home indicators. Display safe-area insets

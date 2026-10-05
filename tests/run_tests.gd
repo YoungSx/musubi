@@ -16,6 +16,7 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_rope_collision.gd",
 	"res://tests/unit/test_rope_drag.gd",
 	"res://tests/unit/test_rope_interaction.gd",
+	"res://tests/unit/test_rope_debug.gd",
 ]
 
 

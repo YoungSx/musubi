@@ -7,14 +7,16 @@
 [ext_resource type="Script" path="res://scripts/interaction/interaction_manager.gd" id="5_interaction"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="6_hud"]
 [ext_resource type="PackedScene" path="res://scenes/rope/rope.tscn" id="7_rope"]
+[ext_resource type="Script" path="res://scripts/debug/rope_debug.gd" id="8_debug"]
 
-[node name="Main" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "interaction_manager", "hud")]
+[node name="Main" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "interaction_manager", "hud", "rope_debug")]
 script = ExtResource("1_app")
 camera_rig = NodePath("CameraRig")
 mannequin = NodePath("Mannequin")
 rope = NodePath("Rope")
 interaction_manager = NodePath("InteractionManager")
 hud = NodePath("Hud")
+rope_debug = NodePath("RopeDebug")
 
 [node name="Studio" parent="." instance=ExtResource("2_studio")]
 
@@ -30,3 +32,6 @@ camera_rig = NodePath("../CameraRig")
 rope = NodePath("../Rope")
 
 [node name="Hud" parent="." instance=ExtResource("6_hud")]
+
+[node name="RopeDebug" type="Node3D" parent="."]
+script = ExtResource("8_debug")
