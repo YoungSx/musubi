@@ -19,6 +19,7 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_rope_debug.gd",
 	"res://tests/unit/test_rope_state.gd",
 	"res://tests/unit/test_desktop_interaction.gd",
+	"res://tests/unit/test_performance_recorder.gd",
 ]
 
 
@@ -35,7 +36,7 @@ func _run() -> void:
 	var failed := 0
 	for path in TEST_SCRIPTS:
 		var script := load(path) as GDScript
-		if script == null:
+		if script == null or not script.can_instantiate():
 			printerr("FAIL  %s: cannot load script" % path)
 			failed += 1
 			continue
