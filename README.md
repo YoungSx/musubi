@@ -95,5 +95,7 @@ in this simulation snapshot. No save UI or filesystem writes are added.
   or GPU allocations. Mobile performance and memory acceptance remain open.
 - iOS export/signing and physical touch remain unverified. Windows recognizes
   the USB-connected iPad, but this environment has no detected `xcrun` or
-  libimobiledevice tools. A macOS/Xcode signing/build environment and matching
-  Godot export templates are needed for native iOS deployment.
+  libimobiledevice tools. Standard export uses macOS/Xcode; Windows can also
+  use WSL cross-compilation and tools such as xtool. This project's full
+  build/sign/install integration has not been verified. See the researched
+  [Windows iOS build routes and prerequisites](docs/windows-ios.md).
