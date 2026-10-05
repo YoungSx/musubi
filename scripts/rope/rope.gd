@@ -19,6 +19,7 @@ var _held := false
 var _last_simulation_ms := 0.0
 var _last_mesh_ms := 0.0
 var _rendered_radius := -1.0
+var _drag_snapshot: Dictionary = {}
 
 @onready var _renderer: RopeRenderer = $RopeRenderer
 
@@ -64,6 +65,7 @@ func reset() -> void:
 	_simulation.set_collision(_collision)
 	_accumulator = 0.0
 	_held = false
+	_drag_snapshot.clear()
 	_sync_anchors()
 	_refresh_mesh()
 
@@ -85,8 +87,10 @@ func get_collision() -> RopeCollision:
 ## Input changes solver intent only. Release holds the whole shape, allowing
 ## the user to orbit, inspect and grab again without losing their arrangement.
 func begin_drag(index: int) -> bool:
+	var before := _simulation.capture_state()
 	if not _simulation.begin_drag(index):
 		return false
+	_drag_snapshot = {"simulation": before, "held": _held, "accumulator": _accumulator}
 	_held = false
 	_accumulator = 0.0
 	return true
@@ -100,6 +104,7 @@ func end_drag() -> void:
 	if _simulation.get_drag_index() < 0:
 		return
 	_simulation.end_drag()
+	_drag_snapshot.clear()
 	_simulation.stop_motion()
 	_held = true
 	_accumulator = 0.0
@@ -108,6 +113,22 @@ func end_drag() -> void:
 
 func is_held() -> bool:
 	return _held
+
+
+func set_held(held: bool) -> void:
+	_held = held
+	_accumulator = 0.0
+
+
+func cancel_drag() -> void:
+	if _drag_snapshot.is_empty():
+		return
+	_simulation = RopeSimulation.restore_state(_drag_snapshot.simulation)
+	_simulation.set_collision(_collision)
+	_held = _drag_snapshot.held
+	_accumulator = _drag_snapshot.accumulator
+	_drag_snapshot.clear()
+	_refresh_mesh()
 
 
 func get_last_simulation_ms() -> float:

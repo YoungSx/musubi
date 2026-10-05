@@ -69,6 +69,13 @@ focus_mode = 0
 toggle_mode = true
 text = "Debug"
 
+[node name="Shortcuts" type="Label" parent="SafeArea/Layout"]
+layout_mode = 2
+theme_type_variation = &"SubtitleLabel"
+text = "R  Reset     F  View     Space  Pause     Esc  Cancel     F11  Full screen"
+horizontal_alignment = 1
+mouse_filter = 2
+
 [node name="Diagnostics" type="Label" parent="."]
 unique_name_in_owner = true
 visible = false

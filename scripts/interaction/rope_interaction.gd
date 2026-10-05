@@ -52,6 +52,15 @@ func get_selected_index() -> int:
 	return _selected_index
 
 
+func cancel() -> void:
+	_rope.cancel_drag()
+	_selected_index = -1
+
+
+func pick(screen_position: Vector2) -> int:
+	return _pick(screen_position)
+
+
 func _project_on_plane(screen_position: Vector2) -> Variant:
 	return _drag_plane.intersects_ray(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
 

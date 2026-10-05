@@ -7,6 +7,7 @@ var _hud: Hud
 var _enabled := false
 var _stats_time := 0.0
 var _hint := ""
+var _hover_index := -1
 var _lines := ImmediateMesh.new()
 var _line_node := MeshInstance3D.new()
 var _obstacle_node := MeshInstance3D.new()
@@ -55,14 +56,20 @@ func is_debug_enabled() -> bool:
 	return _enabled
 
 
+func set_hover_index(index: int) -> void:
+	_hover_index = index
+
+
 func _process(delta: float) -> void:
 	if _rope == null:
 		return
 	var sim := _rope.get_simulation()
 	var selected := sim.get_drag_index()
-	_marker.visible = selected >= 0
-	if selected >= 0:
-		_marker.global_position = sim.get_point(selected)
+	var marker_index := selected if selected >= 0 else _hover_index
+	_marker.visible = marker_index >= 0 and marker_index < sim.get_point_count()
+	if _marker.visible:
+		_marker.global_position = sim.get_point(marker_index)
+		_marker.scale = Vector3.ONE * (1.0 if selected >= 0 else 0.6)
 	var hint := "Drag rope · Drag space to orbit"
 	if _rope.is_held():
 		hint = "Shape held · Grab to continue"

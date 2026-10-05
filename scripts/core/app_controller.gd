@@ -18,6 +18,21 @@ func _ready() -> void:
 	_configure_collision()
 	rope_debug.configure(rope, mannequin, hud)
 	hud.debug_toggled.connect(rope_debug.set_debug_enabled)
+	interaction_manager.hover_changed.connect(rope_debug.set_hover_index)
+	$DesktopShortcuts.action_requested.connect(handle_action)
+
+
+func handle_action(action: StringName) -> void:
+	match action:
+		&"reset": reset()
+		&"focus": camera_rig.reset_view()
+		&"pause":
+			var held := rope.is_held()
+			interaction_manager.reset()
+			rope.set_held(not held)
+		&"cancel": interaction_manager.cancel_drag()
+		&"fullscreen":
+			get_window().mode = Window.MODE_WINDOWED if get_window().mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
 
 
 ## Returns every module to its initial state.

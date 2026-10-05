@@ -66,6 +66,16 @@ func _run() -> void:
 	await _frames(20)
 	_check(app.rope_debug.is_debug_enabled(), "real Debug button shows diagnostics")
 	await _capture("debug")
+	_key(KEY_SPACE)
+	await _frames(1)
+	_check(app.rope.is_held(), "Space pauses")
+	_key(KEY_SPACE)
+	await _frames(1)
+	_check(not app.rope.is_held(), "Space resumes")
+	app.camera_rig.orbit(Vector2(0.1, 0.1))
+	_key(KEY_F)
+	await _frames(1)
+	_check(is_equal_approx(app.camera_rig.get_target_yaw(), deg_to_rad(app.camera_rig.config.yaw_degrees)), "F restores view")
 	print("Rendered interaction smoke: %d failures" % failures)
 	quit(1 if failures else 0)
 
@@ -76,6 +86,16 @@ func _button(position: Vector2, pressed: bool) -> void:
 	event.position = root.get_final_transform() * position
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = pressed
+	Input.parse_input_event(event)
+
+
+func _key(code: Key) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.pressed = true
+	Input.parse_input_event(event)
+	event = event.duplicate()
+	event.pressed = false
 	Input.parse_input_event(event)
 
 

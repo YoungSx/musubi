@@ -9,9 +9,12 @@ extends Node
 
 @export var camera_rig: CameraRig
 @export var rope: Rope
+signal hover_changed(index: int)
 
 var _gestures := GestureTracker.new()
 var _rope_interaction := RopeInteraction.new()
+var _hover_index := -1
+var _hover_time := 0.0
 
 
 func _ready() -> void:
@@ -48,7 +51,34 @@ func _notification(what: int) -> void:
 
 ## Public event seam shared by real input and headless interaction tests.
 func handle_input(event: InputEvent) -> bool:
+	if event is InputEventMouse and event.device != InputEvent.DEVICE_ID_EMULATION:
+		_rope_interaction.pick_radius_pixels = 12.0
+	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_rope_interaction.pick_radius_pixels = 24.0
 	return _gestures.handle(event)
+
+
+func _process(delta: float) -> void:
+	if not OS.has_feature("pc"):
+		return
+	_hover_time -= delta
+	if _hover_time > 0.0:
+		return
+	_hover_time = 0.05
+	var index := -1
+	var point := get_viewport().get_mouse_position()
+	if _gestures.get_pointer_count() == 0 and get_viewport().gui_get_hovered_control() == null and get_viewport().get_visible_rect().has_point(point):
+		_rope_interaction.pick_radius_pixels = 12.0
+		index = _rope_interaction.pick(point)
+	if index != _hover_index:
+		_hover_index = index
+		hover_changed.emit(index)
+		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if index >= 0 else Input.CURSOR_ARROW)
+
+
+func cancel_drag() -> void:
+	_rope_interaction.cancel()
+	_gestures.reset()
 
 
 func get_selected_index() -> int:

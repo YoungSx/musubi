@@ -29,6 +29,10 @@ Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
 and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
 pans, wheel zooms. The two dark attachment endpoints stay fixed.
 
+Desktop: the rope highlights on hover. R resets the scene, F restores the view,
+Space pauses/resumes, Esc cancels a grab and restores its starting shape, and
+F11 toggles full screen. Mouse picking uses a tighter tolerance than touch.
+
 ## Module boundaries
 
 | Location | Responsibility |
@@ -65,11 +69,11 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 53 tests passed. A rendered scene smoke check exercised camera orbit,
+All 56 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
-It also clicks Debug and captures the diagnostic overlay.
+It also clicks Debug, captures the diagnostic overlay and verifies Space/F keys.
 This checks scene integration, not physical touchscreen input. Tests cover
 two-finger transitions, cancellation, focus loss and occluded picking.
 
