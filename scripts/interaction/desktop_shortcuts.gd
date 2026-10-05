@@ -17,6 +17,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 static func action_for_key(event: InputEventKey) -> StringName:
 	var key := event.physical_keycode if event.physical_keycode else event.keycode
 	if event.ctrl_pressed or event.meta_pressed:
+		if key == KEY_Z:
+			return &"redo" if event.shift_pressed else &"undo"
+		if key == KEY_Y:
+			return &"redo"
 		return &"save" if key == KEY_S else (&"load" if key == KEY_O else &"")
 	if event.alt_pressed or event.shift_pressed:
 		return &""

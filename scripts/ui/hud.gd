@@ -8,6 +8,7 @@ signal debug_toggled(enabled: bool)
 signal action_requested(action: StringName)
 signal save_requested(path: String)
 signal load_requested(path: String)
+signal new_rope_requested(length_m: float)
 
 @onready var _reset_button: Button = %ResetButton
 @onready var _safe_area: MarginContainer = %SafeArea
@@ -24,6 +25,16 @@ func _ready() -> void:
 	%LoadButton.pressed.connect(func(): action_requested.emit(&"load"))
 	%SimulateButton.pressed.connect(func(): action_requested.emit(&"pause"))
 	%BackButton.pressed.connect(func(): action_requested.emit(&"back"))
+	%UndoButton.pressed.connect(func(): action_requested.emit(&"undo"))
+	%RedoButton.pressed.connect(func(): action_requested.emit(&"redo"))
+	var menu: PopupMenu = %RopeButton.get_popup()
+	menu.add_item("New rope · 1.4 m", 0)
+	menu.add_item("New rope · 2.2 m", 1)
+	menu.add_item("New rope · 3.0 m", 2)
+	menu.add_separator()
+	menu.add_item("Release A", 10)
+	menu.add_item("Release B", 11)
+	menu.id_pressed.connect(_rope_menu_selected)
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
 		_base_margins[side] = _safe_area.get_theme_constant(side)
 	get_viewport().size_changed.connect(_apply_safe_area)
@@ -48,6 +59,27 @@ func set_simulation_state(held: bool, dragging: bool) -> void:
 	%SimulateButton.text = "Continue" if held else "Hold"
 	%SimulateButton.disabled = dragging
 	%BackButton.disabled = dragging
+	%RopeButton.disabled = dragging
+
+
+func set_history_state(undo_available: bool, redo_available: bool) -> void:
+	%UndoButton.disabled = not undo_available
+	%RedoButton.disabled = not redo_available
+
+
+func set_rope_state(length_m: float, start_attached: bool, end_attached: bool) -> void:
+	%RopeButton.text = "Rope · %.1f m" % length_m
+	%AttachmentState.text = "A %s · B %s" % ["fixed" if start_attached else "free", "fixed" if end_attached else "free"]
+	var menu: PopupMenu = %RopeButton.get_popup()
+	menu.set_item_text(menu.get_item_index(10), "Release A" if start_attached else "Fix A here")
+	menu.set_item_text(menu.get_item_index(11), "Release B" if end_attached else "Fix B here")
+
+
+func _rope_menu_selected(id: int) -> void:
+	if id >= 0 and id <= 2:
+		new_rope_requested.emit([1.4, 2.2, 3.0][id])
+	elif id == 10 or id == 11:
+		action_requested.emit(&"attachment_a" if id == 10 else &"attachment_b")
 
 
 func show_file_dialog(saving: bool, last_path: String = "") -> void:

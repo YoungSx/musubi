@@ -135,7 +135,7 @@ func test_invalid_scene_snapshot_never_mutates_live_rope() -> void:
 	var bad_accumulator := before.duplicate(true)
 	bad_accumulator.accumulator = -0.1
 	var bad_config := before.duplicate(true)
-	bad_config.simulation.config.radius *= 2.0
+	bad_config.simulation.config.radius = -0.01
 	for malformed in [bad_mass, bad_flag, bad_position, bad_accumulator, bad_config]:
 		assert_true(not rope.validate_scene_state(malformed), "malformed snapshot rejected")
 		assert_true(not rope.restore_scene_state(malformed), "invalid restore rejected")

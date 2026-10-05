@@ -37,6 +37,12 @@ shape and attachments; Reset restores both original attachments.
 Desktop: the rope highlights on hover. R resets the scene, F restores the view,
 Space pauses/resumes, Esc cancels a grab and restores its starting shape, and
 F11 toggles full screen. Mouse picking uses a tighter tolerance than touch.
+Gold marks the grabbed rope; blue marks its requested target, including when
+occluded. Continue/Hold controls physics explicitly; B or Other side turns the
+camera around. The Rope menu creates 1.4/2.2/3.0 m ropes and fixes/releases A or B.
+Ctrl+Z undoes a rope edit, Ctrl+Shift+Z/Ctrl+Y redoes it. History includes grabs,
+endpoint changes, new ropes and Reset; camera movement is not undone. It is
+bounded to 32 entries and 4 MiB of encoded snapshots. Loading clears history.
 Save/Open (Ctrl+S/Ctrl+O) writes and restores `.musubi` creations, including
 rope shape and velocity, free endpoints, held state, camera and mannequin pose.
 F9 exports rolling CPU/frame measurements as JSON and CSV, with a scene snapshot,
@@ -87,7 +93,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 82 tests passed. A rendered scene smoke check exercised camera orbit,
+All 88 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.

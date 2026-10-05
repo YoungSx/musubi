@@ -56,8 +56,8 @@ func configure(rope: Rope, mannequin: Mannequin, hud: Hud) -> void:
 	for name in ["A", "B"]:
 		var label := Label3D.new()
 		label.text = name
-		label.font_size = 24
-		label.pixel_size = 0.0012
+		label.font_size = 32
+		label.pixel_size = 0.002
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		label.modulate = Color("efc98b")
 		add_child(label)
@@ -98,6 +98,7 @@ func _process(delta: float) -> void:
 		_rope.end_anchor.visible = _rope.is_end_attached()
 	var selected := sim.get_drag_index()
 	_hud.set_simulation_state(_rope.is_held(), selected >= 0)
+	_hud.set_rope_state(_rope.config.length, _rope.is_start_attached(), _rope.is_end_attached())
 	for side in 2:
 		_end_labels[side].global_position = sim.get_point(0 if side == 0 else sim.get_point_count() - 1) + Vector3.UP * 0.05
 	_target_marker.visible = selected >= 0

@@ -12,6 +12,7 @@ extends Node3D
 @export var rope_debug: RopeDebug
 
 var _last_creation_path := ""
+var history := RopeHistory.new()
 
 
 func _ready() -> void:
@@ -23,9 +24,12 @@ func _ready() -> void:
 	hud.action_requested.connect(handle_action)
 	hud.save_requested.connect(save_creation)
 	hud.load_requested.connect(load_creation)
+	hud.new_rope_requested.connect(new_rope)
 	interaction_manager.hover_changed.connect(rope_debug.set_hover_index)
 	$DesktopShortcuts.action_requested.connect(handle_action)
 	$PerformanceCapture.rope = rope
+	rope.edit_completed.connect(_record_edit)
+	_refresh_history_controls()
 
 
 func handle_action(action: StringName) -> void:
@@ -40,6 +44,20 @@ func handle_action(action: StringName) -> void:
 			interaction_manager.reset()
 			rope.set_held(not held)
 		&"cancel": interaction_manager.cancel_drag()
+		&"attachment_a", &"attachment_b":
+			interaction_manager.reset()
+			var before := rope.capture_scene_state()
+			var side := 0 if action == &"attachment_a" else 1
+			rope.set_endpoint_attached(side, not (rope.is_start_attached() if side == 0 else rope.is_end_attached()))
+			_record_edit(before, rope.capture_scene_state())
+		&"undo", &"redo":
+			if interaction_manager.get_selected_index() >= 0:
+				interaction_manager.cancel_drag()
+				return
+			var changed := history.undo(rope) if action == &"undo" else history.redo(rope)
+			if changed:
+				hud.set_status("Undone" if action == &"undo" else "Redone")
+			_refresh_history_controls()
 		&"fullscreen":
 			get_window().mode = Window.MODE_WINDOWED if get_window().mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
 		&"report": export_performance_report()
@@ -60,11 +78,26 @@ func save_creation(path: String) -> Error:
 	return error
 
 
+func new_rope(length_m: float) -> bool:
+	if RopeConfig.for_length(length_m) == null:
+		return false
+	interaction_manager.reset()
+	var before := rope.capture_scene_state()
+	var changed := rope.new_rope(length_m)
+	if changed:
+		_record_edit(before, rope.capture_scene_state())
+		$PerformanceCapture.recorder.reset()
+		hud.set_status("New %.1f m rope" % length_m)
+	return changed
+
+
 func load_creation(path: String) -> bool:
 	if not MusubiSceneState.apply(self, MusubiSceneState.read_file(path)):
 		hud.set_status("Could not open this creation. The file is invalid or incompatible.")
 		return false
 	_last_creation_path = path
+	history.clear()
+	_refresh_history_controls()
 	rope_debug.refresh_collision(mannequin)
 	$PerformanceCapture.recorder.reset()
 	hud.set_status("Opened: " + path.get_file())
@@ -85,6 +118,7 @@ func export_performance_report() -> Error:
 ## Returns every module to its initial state.
 func reset() -> void:
 	interaction_manager.reset()
+	var before := rope.capture_scene_state()
 	mannequin.reset_pose()
 	_configure_collision()
 	rope.reset()
@@ -92,6 +126,16 @@ func reset() -> void:
 	$PerformanceCapture.recorder.reset()
 	rope_debug.refresh_collision(mannequin)
 	hud.set_status("")
+	_record_edit(before, rope.capture_scene_state())
+
+
+func _record_edit(before: Dictionary, after: Dictionary) -> void:
+	history.record(before, after)
+	_refresh_history_controls()
+
+
+func _refresh_history_controls() -> void:
+	hud.set_history_state(history.can_undo(), history.can_redo())
 
 
 func _configure_collision() -> void:

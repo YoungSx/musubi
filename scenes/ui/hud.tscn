@@ -34,6 +34,40 @@ theme_type_variation = &"SubtitleLabel"
 text = "rope · form · connection"
 horizontal_alignment = 1
 
+[node name="RopeControls" type="HFlowContainer" parent="SafeArea/Layout"]
+layout_mode = 2
+alignment = 1
+mouse_filter = 2
+
+[node name="RopeButton" type="MenuButton" parent="SafeArea/Layout/RopeControls"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(150, 44)
+focus_mode = 0
+text = "Rope · 1.4 m"
+tooltip_text = "New rope or fix/release either endpoint"
+
+[node name="UndoButton" type="Button" parent="SafeArea/Layout/RopeControls"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+text = "Undo"
+tooltip_text = "Undo last rope edit · Ctrl+Z"
+
+[node name="RedoButton" type="Button" parent="SafeArea/Layout/RopeControls"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+text = "Redo"
+tooltip_text = "Redo rope edit · Ctrl+Shift+Z / Ctrl+Y"
+
+[node name="AttachmentState" type="Label" parent="SafeArea/Layout/RopeControls"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SubtitleLabel"
+text = "A fixed · B fixed"
+mouse_filter = 2
+
 [node name="Spacer" type="Control" parent="SafeArea/Layout"]
 layout_mode = 2
 size_flags_vertical = 3

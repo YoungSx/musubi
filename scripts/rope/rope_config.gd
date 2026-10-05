@@ -38,3 +38,22 @@ func get_rest_length() -> float:
 
 func get_time_step() -> float:
 	return 1.0 / float(simulation_rate)
+
+
+static func for_length(length_m: float) -> RopeConfig:
+	var result := RopeConfig.new()
+	if is_equal_approx(length_m, 1.4):
+		result.segment_count = 48
+	elif is_equal_approx(length_m, 2.2):
+		result.segment_count = 72
+	elif is_equal_approx(length_m, 3.0):
+		result.segment_count = 96
+	else:
+		return null
+	result.length = length_m
+	return result
+
+
+## Numeric ranges are validated by RopeState before this workload check.
+func is_scene_supported() -> bool:
+	return segment_count * substeps * solver_iterations * collision_iterations <= 8192

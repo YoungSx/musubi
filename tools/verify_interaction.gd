@@ -106,6 +106,7 @@ func _run() -> void:
 	_check(app.rope.is_start_attached() and app.rope.is_end_attached(), "Esc restores endpoint attachments")
 	_button(position, false)
 	await _verify_creation_dialogs()
+	await _verify_creation_controls()
 	print("Rendered interaction smoke: %d failures" % failures)
 	quit(1 if failures else 0)
 
@@ -170,14 +171,54 @@ func _button(position: Vector2, pressed: bool) -> void:
 	Input.parse_input_event(event)
 
 
-func _key(code: Key) -> void:
+func _key(code: Key, control := false, shift := false) -> void:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.ctrl_pressed = control
+	event.shift_pressed = shift
 	event.pressed = true
 	Input.parse_input_event(event)
 	event = event.duplicate()
 	event.pressed = false
 	Input.parse_input_event(event)
+
+
+func _verify_creation_controls() -> void:
+	var rope_button := app.hud.get_node("%RopeButton") as MenuButton
+	_button(rope_button.get_global_rect().get_center(), true)
+	_button(rope_button.get_global_rect().get_center(), false)
+	await _frames(2)
+	var menu := rope_button.get_popup()
+	_check(menu.visible, "rope menu opens through mouse input")
+	menu.id_pressed.emit(2)
+	menu.hide()
+	await _frames(2)
+	_check(app.rope.config.segment_count == 96, "new 3m rope has matching topology")
+	_key(KEY_Z, true)
+	await _frames(2)
+	_check(is_equal_approx(app.rope.config.length, 1.4), "Ctrl Z undoes new rope")
+	_key(KEY_Z, true, true)
+	await _frames(2)
+	_check(is_equal_approx(app.rope.config.length, 3.0), "Ctrl Shift Z restores long rope")
+	menu.id_pressed.emit(10)
+	await _frames(2)
+	_check(not app.rope.is_start_attached() and app.rope.is_held(), "menu releases A while holding shape")
+	_key(KEY_Z, true)
+	await _frames(2)
+	_check(app.rope.is_start_attached(), "Undo restores attachment")
+	_key(KEY_Y, true)
+	await _frames(2)
+	_check(not app.rope.is_start_attached(), "Ctrl Y redoes endpoint release")
+	var simulate := app.hud.get_node("%SimulateButton") as Button
+	_button(simulate.get_global_rect().get_center(), true)
+	_button(simulate.get_global_rect().get_center(), false)
+	await _frames(2)
+	_check(not app.rope.is_held(), "Continue button resumes physics")
+	var yaw := app.camera_rig.get_target_yaw()
+	_key(KEY_B)
+	await _frames(30)
+	_check(is_equal_approx(app.camera_rig.get_target_yaw(), yaw + PI), "B turns view to other side")
+	await _capture("creation-controls")
 
 
 func _frames(count: int) -> void:

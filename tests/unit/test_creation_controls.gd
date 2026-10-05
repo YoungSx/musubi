@@ -1,0 +1,42 @@
+extends TestCase
+
+
+func test_length_presets_and_cross_configuration_scene_restore() -> void:
+	var app := _app()
+	for length_m in [1.4, 2.2, 3.0]:
+		assert_true(app.new_rope(length_m), "preset accepted")
+		assert_near(app.rope.config.length, length_m, "correct rest length")
+		assert_true(app.rope.config.get_rest_length() <= 0.033, "particle density preserved")
+		app.rope.set_held(true)
+		var saved := MusubiSceneState.capture(app)
+		app.new_rope(1.4)
+		assert_true(MusubiSceneState.apply(app, JSON.parse_string(JSON.stringify(saved, "", true, true))), "different configuration restores")
+		assert_near(app.rope.config.length, length_m, "renderer/scheduler config matches loaded simulation")
+		assert_eq(app.rope.get_simulation().get_point_count(), app.rope.config.segment_count + 1, "topology restored")
+		app.reset()
+		assert_near(app.rope.config.length, length_m, "reset preserves selected rope length")
+	var before := MusubiSceneState.capture(app)
+	assert_true(not app.new_rope(100), "unknown preset rejected")
+	assert_eq(MusubiSceneState.capture(app), before, "invalid request is inert")
+
+
+func test_fix_release_endpoints_and_import_work_bound() -> void:
+	var app := _app()
+	app.handle_action(&"attachment_a")
+	assert_true(not app.rope.is_start_attached() and app.rope.is_held(), "release holds current shape")
+	var point := app.rope.get_simulation().get_point(0)
+	app.handle_action(&"attachment_a")
+	assert_true(app.rope.is_start_attached(), "fix endpoint")
+	assert_eq(app.rope.start_anchor.global_position, point, "fix happens at current position")
+	var saved := MusubiSceneState.capture(app)
+	var invalid := saved.duplicate(true)
+	invalid.rope.simulation.config.substeps = 32
+	invalid.rope.simulation.config.solver_iterations = 64
+	assert_true(not MusubiSceneState.apply(app, invalid), "expensive untrusted configuration refused")
+	assert_eq(MusubiSceneState.capture(app), saved, "rejected import preserves scene")
+
+
+func _app() -> AppController:
+	var app := add_to_tree(load("res://scenes/main/main.tscn").instantiate()) as AppController
+	app.process_mode = Node.PROCESS_MODE_DISABLED
+	return app

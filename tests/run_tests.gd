@@ -23,6 +23,8 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_desktop_interaction.gd",
 	"res://tests/unit/test_performance_recorder.gd",
 	"res://tests/unit/test_scene_state.gd",
+	"res://tests/unit/test_creation_controls.gd",
+	"res://tests/unit/test_rope_history.gd",
 ]
 
 

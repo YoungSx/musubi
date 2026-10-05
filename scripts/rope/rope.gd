@@ -11,6 +11,7 @@ extends Node3D
 @export var config: RopeConfig
 @export var start_anchor: Node3D
 @export var end_anchor: Node3D
+signal edit_completed(before: Dictionary, after: Dictionary)
 
 var _simulation: RopeSimulation
 var _collision: RopeCollision
@@ -64,6 +65,8 @@ func advance(delta: float) -> int:
 
 ## Lays the rope out in its rest shape between the anchors.
 func reset() -> void:
+	config = config.duplicate() as RopeConfig
+	config.self_collision_enabled = true
 	if start_anchor != null:
 		start_anchor.global_position = _initial_start_position
 	if end_anchor != null:
@@ -96,6 +99,36 @@ func get_collision() -> RopeCollision:
 	return _collision
 
 
+func new_rope(length_m: float) -> bool:
+	var preset := RopeConfig.for_length(length_m)
+	if preset == null or _simulation.get_drag_index() >= 0:
+		return false
+	config = preset
+	reset()
+	return true
+
+
+func set_endpoint_attached(side: int, attached: bool) -> bool:
+	if side not in [0, 1] or _simulation.get_drag_index() >= 0:
+		return false
+	var anchor := start_anchor if side == 0 else end_anchor
+	if anchor == null:
+		return false
+	var index := 0 if side == 0 else _simulation.get_point_count() - 1
+	if attached:
+		anchor.global_position = _simulation.get_point(index)
+		_simulation.pin(index, anchor.global_position)
+	else:
+		_simulation.unpin(index)
+	if side == 0:
+		_start_attached = attached
+	else:
+		_end_attached = attached
+	_simulation.stop_motion()
+	set_held(true)
+	return true
+
+
 ## Input changes solver intent only. Release holds the whole shape, allowing
 ## the user to orbit, inspect and grab again without losing their arrangement.
 func begin_drag(index: int) -> bool:
@@ -124,12 +157,14 @@ func update_drag_target(target: Vector3) -> void:
 func end_drag() -> void:
 	if _simulation.get_drag_index() < 0:
 		return
+	var before := _drag_snapshot.duplicate(true)
 	_simulation.end_drag()
 	_drag_snapshot.clear()
 	_simulation.stop_motion()
 	_held = true
 	_accumulator = 0.0
 	_refresh_mesh()
+	edit_completed.emit(before, capture_scene_state())
 
 
 func is_held() -> bool:
@@ -181,16 +216,10 @@ func validate_scene_state(data: Dictionary) -> bool:
 	var accumulator: Variant = data.get("accumulator")
 	if not (accumulator is float or accumulator is int) or not is_finite(float(accumulator)):
 		return false
-	if accumulator < 0.0 or accumulator > config.get_time_step() + 1e-9 or (data.held and accumulator != 0.0):
-		return false
 	var state := RopeState.decode(data.simulation)
-	if state.is_empty() or state.drag_index != -1:
+	if state.is_empty() or state.drag_index != -1 or not state.config.is_scene_supported():
 		return false
-	# A scene snapshot belongs to the current preset and renderer topology.
-	for key in RopeState.CONFIG_RANGES:
-		if not is_equal_approx(float(state.config.get(key)), float(config.get(key))):
-			return false
-	if not state.config.gravity.is_equal_approx(config.gravity):
+	if accumulator < 0.0 or accumulator > state.config.get_time_step() + 1e-9 or (data.held and accumulator != 0.0):
 		return false
 	for side in ["start", "end"]:
 		var anchor: Node3D = start_anchor if side == "start" else end_anchor
@@ -218,6 +247,7 @@ func restore_scene_state(data: Dictionary) -> bool:
 	if restored == null:
 		return false
 	_simulation = restored
+	config = RopeState.decode(data.simulation).config
 	_simulation.set_collision(_collision)
 	_held = data.held
 	_accumulator = float(data.accumulator)
