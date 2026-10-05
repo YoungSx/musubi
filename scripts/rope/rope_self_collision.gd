@@ -21,7 +21,10 @@ func solve(p: PackedVector3Array, previous: PackedVector3Array, mass: PackedFloa
 	var count := p.size() - 1
 	_minimum.resize(count)
 	_maximum.resize(count)
-	_order.resize(count)
+	if _order.size() != count:
+		_order.resize(count)
+		for i in count:
+			_order[i] = i
 	var diameter := radius * 2.0 + SKIN
 	# Nearby material belongs to the same continuous tube. At fine resolution,
 	# exclude enough neighbors to avoid inflating a straight rope against itself.
@@ -29,12 +32,15 @@ func solve(p: PackedVector3Array, previous: PackedVector3Array, mass: PackedFloa
 	for i in count:
 		_minimum[i] = p[i].min(p[i + 1]).min(start[i]).min(start[i + 1]) - Vector3.ONE * radius
 		_maximum[i] = p[i].max(p[i + 1]).max(start[i]).max(start[i + 1]) + Vector3.ONE * (radius + SKIN)
-		_order[i] = i
+	# Keep temporal ordering: neighboring substeps barely move the bounds.
+	# Index tie-breaking makes the result independent of cache/restore history.
+	for i in count:
+		var segment := _order[i]
 		var k := i
-		while k > 0 and _minimum[_order[k - 1]].x > _minimum[i].x:
+		while k > 0 and (_minimum[_order[k - 1]].x > _minimum[segment].x or (_minimum[_order[k - 1]].x == _minimum[segment].x and _order[k - 1] > segment)):
 			_order[k] = _order[k - 1]
 			k -= 1
-		_order[k] = i
+		_order[k] = segment
 	for a in count:
 		var i := _order[a]
 		for b in range(a + 1, count):

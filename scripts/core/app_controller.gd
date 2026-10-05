@@ -54,7 +54,7 @@ func handle_action(action: StringName) -> void:
 			if interaction_manager.get_selected_index() >= 0:
 				interaction_manager.cancel_drag()
 				return
-			var changed := history.undo(rope) if action == &"undo" else history.redo(rope)
+			var changed := history.undo(self) if action == &"undo" else history.redo(self)
 			if changed:
 				hud.set_status("Undone" if action == &"undo" else "Redone")
 			_refresh_history_controls()
@@ -86,6 +86,7 @@ func new_rope(length_m: float) -> bool:
 	var changed := rope.new_rope(length_m)
 	if changed:
 		_record_edit(before, rope.capture_scene_state())
+		_last_creation_path = ""
 		$PerformanceCapture.recorder.reset()
 		hud.set_status("New %.1f m rope" % length_m)
 	return changed
@@ -118,7 +119,7 @@ func export_performance_report() -> Error:
 ## Returns every module to its initial state.
 func reset() -> void:
 	interaction_manager.reset()
-	var before := rope.capture_scene_state()
+	var before := MusubiSceneState.capture(self)
 	mannequin.reset_pose()
 	_configure_collision()
 	rope.reset()
@@ -126,11 +127,16 @@ func reset() -> void:
 	$PerformanceCapture.recorder.reset()
 	rope_debug.refresh_collision(mannequin)
 	hud.set_status("")
-	_record_edit(before, rope.capture_scene_state())
+	history.record(before, MusubiSceneState.capture(self))
+	_refresh_history_controls()
 
 
 func _record_edit(before: Dictionary, after: Dictionary) -> void:
-	history.record(before, after)
+	var scene_before := MusubiSceneState.capture(self)
+	var scene_after := scene_before.duplicate(true)
+	scene_before.rope = before
+	scene_after.rope = after
+	history.record(scene_before, scene_after)
 	_refresh_history_controls()
 
 

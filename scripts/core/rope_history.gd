@@ -25,17 +25,27 @@ func record(before: Dictionary, after: Dictionary) -> void:
 	_cursor = _entries.size()
 
 
-func undo(rope: Rope) -> bool:
-	if not can_undo() or not rope.restore_scene_state(_entries[_cursor - 1].before):
+func undo(app: Node) -> bool:
+	if not can_undo() or not _restore(app, _entries[_cursor - 1].before):
 		return false
 	_cursor -= 1
 	return true
 
 
-func redo(rope: Rope) -> bool:
-	if not can_redo() or not rope.restore_scene_state(_entries[_cursor].after):
+func redo(app: Node) -> bool:
+	if not can_redo() or not _restore(app, _entries[_cursor].after):
 		return false
 	_cursor += 1
+	return true
+
+
+func _restore(app: Node, state: Dictionary) -> bool:
+	var restored := state.duplicate(true)
+	# Rebuild the matching obstacle pose but keep the user's current view.
+	restored.camera = app.camera_rig.capture_state()
+	if not MusubiSceneState.apply(app, restored):
+		return false
+	app.rope_debug.refresh_collision(app.mannequin)
 	return true
 
 

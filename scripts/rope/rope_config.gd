@@ -51,6 +51,12 @@ static func for_length(length_m: float) -> RopeConfig:
 	else:
 		return null
 	result.length = length_m
+	if length_m > 1.4:
+		# Longer ropes retain ~3 cm sampling but use a desktop 60 Hz schedule.
+		# Eight to ten substeps preserve contact/length quality without paying
+		# for two complete simulations per 60 Hz rendered frame.
+		result.simulation_rate = 60
+		result.substeps = 10 if length_m < 3.0 else 8
 	return result
 
 

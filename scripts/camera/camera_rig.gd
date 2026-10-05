@@ -151,6 +151,11 @@ static func _decode_orbit(data: Dictionary, view: OrbitState) -> void:
 
 
 func _apply_current() -> void:
+	# Desktop controls occupy roughly fixed canvas space. Widen the vertical
+	# field of view in short/high-DPI windows so the default figure stays clear
+	# of the header/footer, without changing saved camera intent.
+	var canvas_height := maxf(get_viewport().get_visible_rect().size.y, 1.0)
+	_camera.fov = minf(config.fov * maxf(1.0, 640.0 / canvas_height), 70.0) if OS.has_feature("pc") else config.fov
 	_camera.transform = compute_camera_transform(_current.yaw, _current.pitch, _current.distance, _current.focus)
 
 

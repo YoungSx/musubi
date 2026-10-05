@@ -51,6 +51,7 @@ func _run() -> void:
 	# is nearer the center than the torso. Check winding as well as back passage.
 	_check(absf(turn) > 4.0 and farthest_back < -0.05, "input-created rope passes around mannequin")
 	_check(app.rope.get_simulation().get_max_segment_stretch() < 0.08, "wrap keeps bounded rope length")
+	print("Rendered creation performance: ", app.get_node("PerformanceCapture").recorder.summary())
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(args[0].path_join("creation-wrap.png"))
 	var path := args[0].path_join("input-created-wrap.musubi")
@@ -58,8 +59,38 @@ func _run() -> void:
 	app.new_rope(1.4)
 	_check(app.load_creation(path), "saved long creation loads over short rope")
 	_check(app.rope.get_simulation().get_positions() == points, "saved geometry restored exactly")
+	await _verify_depth_passage(args[0])
 	print("Creation workflow failures: ", failures)
 	quit(1 if failures else 0)
+
+
+func _verify_depth_passage(output: String) -> void:
+	# Approach the open space beside the left leg from in front, then move
+	# through depth. This exercises re-grabbing and under/over placement without
+	# injecting a prebuilt knot or changing particle positions.
+	var camera := app.camera_rig.get_camera()
+	await _frames(3)
+	pointer = camera.unproject_position(app.rope.get_simulation().get_point(0))
+	_button(true)
+	await _frames(1)
+	_check(app.interaction_manager.get_selected_index() == 0, "re-grab saved free endpoint")
+	if app.interaction_manager.get_selected_index() != 0:
+		return
+	var start := app.rope.get_simulation().get_point(0)
+	var front := Vector3(-0.23, 0.65, 0.35)
+	var back := Vector3(-0.23, 0.65, -0.25)
+	for phase in 2:
+		for frame in 90:
+			_move_to((start if phase == 0 else front).lerp(front if phase == 0 else back, float(frame + 1) / 90.0))
+			await _frames(2)
+	await _frames(60)
+	var reached := app.rope.get_simulation().get_point(0)
+	print("Depth passage endpoint=", reached, " target=", back)
+	_check(reached.z < -0.05, "wheel and pointer move free end through to back side")
+	_button(false)
+	await _frames(2)
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png(output.path_join("creation-depth-passage.png"))
 
 
 func _move_to(target: Vector3) -> void:

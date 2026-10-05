@@ -7,7 +7,7 @@ the simulation and touch input portable. Open `project.godot`
 in Godot and run the main scene (F6 from `scenes/main/main.tscn`, or F5).
 No third-party dependencies are required.
 
-## Current milestone: interactive prototype with diagnostics
+## Current milestone: Windows creation prototype (0.3.0)
 
 - Abstract mannequin and studio lighting.
 - One procedural tube mesh with rounded ends, suspended between two anchors.
@@ -73,6 +73,9 @@ The default rope uses 48 segments, a 1.4 m rest length, 120 Hz simulation,
 6 substeps and 2 constraint iterations per substep. Catch-up is bounded after
 frame hitches. The desktop window starts at 1280×800, resizes down to 960×640
 and adapts UI scale to display DPI. Mobile retains its portrait viewport.
+New 2.2 m and 3.0 m ropes use 72/96 segments at 60 Hz with 10/8 substeps.
+Imported creations restore their own validated configuration and simulation
+frequency; the renderer rebuilds topology accordingly.
 
 ## Verification
 
@@ -86,6 +89,9 @@ godot --path . -s res://tools/verify_interaction.gd -- <output-directory>
 godot --path . -s res://tools/verify_self_collision.gd -- <output-directory>
 godot --path . -s res://tools/verify_tightening.gd -- <output-directory>
 godot --path . -s res://tools/verify_wrap.gd -- <output-directory>
+godot --path . -s res://tools/verify_creation_workflow.gd -- <output-directory>
+godot --headless --path . -s res://tools/benchmark_creation.gd
+godot --path . -s res://tools/verify_desktop_stability.gd
 ```
 
 The screenshot command requires a graphics driver and an existing output
@@ -93,7 +99,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 88 tests passed. A rendered scene smoke check exercised camera orbit,
+All 89 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -115,6 +121,8 @@ Simulation format v2 includes self-contact settings. Existing v1 creations load
 with self-contact disabled to preserve their behavior; Reset starts a new rope
 with the current default (enabled). Debug shows the active setting and last-pass
 contact count. See [self-contact implementation and verification](docs/rope-self-collision.md).
+See [Windows creation controls and acceptance](docs/windows-creation.md) for
+the complete authoring workflow, history behavior and measured limitations.
 
 ## Remaining validation and next milestone
 

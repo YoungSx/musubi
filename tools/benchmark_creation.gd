@@ -34,6 +34,8 @@ func _run() -> void:
 		timings.sort()
 		report[str(length_m)] = {"cpu_median_ms": timings[180], "cpu_p95_ms": timings[341], "max_stretch": worst_stretch}
 		print(length_m, "m: ", report[str(length_m)])
+		if worst_stretch > 0.08:
+			failures += 1
 	# Saturate bounded history, then check repeated creation/reset does not keep
 	# increasing live object count or grow memory by more than allocator slack.
 	for edit in 40:

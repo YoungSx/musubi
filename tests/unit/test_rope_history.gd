@@ -62,6 +62,20 @@ func test_shortcuts_map_undo_and_redo() -> void:
 	assert_eq(DesktopShortcuts.action_for_key(key), &"redo", "Ctrl Y")
 
 
+func test_reset_undo_restores_obstacles_but_keeps_current_view() -> void:
+	var app := _app()
+	app.mannequin.position = Vector3(0.1, 0.05, 0.1)
+	app._configure_collision()
+	app.rope.set_held(true)
+	var pose := app.mannequin.global_transform
+	app.reset()
+	app.camera_rig.orbit(Vector2(0.2, 0.1))
+	var view := app.camera_rig.capture_state()
+	app.handle_action(&"undo")
+	assert_eq(app.mannequin.global_transform, pose, "undo reset restores matching obstacle pose")
+	assert_eq(app.camera_rig.capture_state(), view, "undo keeps current inspection view")
+
+
 func _app() -> AppController:
 	var app := add_to_tree(load("res://scenes/main/main.tscn").instantiate()) as AppController
 	app.process_mode = Node.PROCESS_MODE_DISABLED
