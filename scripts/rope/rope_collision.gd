@@ -150,19 +150,20 @@ func constrain_motion(from: Vector3, to: Vector3, rope_radius: float) -> Vector3
 ## Mutates only movable particles. Segment corrections are distributed by
 ## barycentric weights, preserving a pinned endpoint exactly.
 func solve(positions: PackedVector3Array, previous: PackedVector3Array, inverse_mass: PackedFloat32Array, rope_radius: float, friction: float) -> void:
+	var contact_radius := rope_radius + SKIN
 	for i in positions.size():
 		if inverse_mass[i] > 0.0:
 			apply_contact(positions, previous, i, project_point(positions[i], rope_radius) - positions[i], friction)
 	for i in positions.size() - 1:
 		if inverse_mass[i] + inverse_mass[i + 1] == 0.0:
 			continue
+		var a := positions[i]
+		var b := positions[i + 1]
+		var segment_bounds := AABB(a.min(b), (b - a).abs()).grow(contact_radius)
 		for part in _parts:
-			var a := positions[i]
-			var b := positions[i + 1]
-			var segment_bounds := AABB(a.min(b), (b - a).abs()).grow(rope_radius + SKIN)
 			if not segment_bounds.intersects(part.bounds):
 				continue
-			var contact := part.segment_contact(a, b, rope_radius + SKIN)
+			var contact := part.segment_contact(a, b, contact_radius)
 			var push := Vector3(contact.x, contact.y, contact.z)
 			var w0 := (1.0 - contact.w) * inverse_mass[i]
 			var w1 := contact.w * inverse_mass[i + 1]
@@ -171,6 +172,10 @@ func solve(positions: PackedVector3Array, previous: PackedVector3Array, inverse_
 				continue
 			apply_contact(positions, previous, i, push * (w0 / weight), friction)
 			apply_contact(positions, previous, i + 1, push * (w1 / weight), friction)
+			# Only a contact changes the bounds needed for the next primitive.
+			a = positions[i]
+			b = positions[i + 1]
+			segment_bounds = AABB(a.min(b), (b - a).abs()).grow(contact_radius)
 
 
 static func apply_contact(positions: PackedVector3Array, previous: PackedVector3Array, index: int, push: Vector3, friction: float) -> void:

@@ -52,3 +52,29 @@ func test_advance_uses_fixed_steps() -> void:
 	assert_eq(rope.advance(dt * 0.5), 0, "half step accumulates")
 	assert_eq(rope.advance(dt * 0.5), 1, "then one step")
 	assert_eq(rope.advance(10.0), rope.config.max_steps_per_tick, "hitch is capped")
+
+
+func test_held_rope_skips_mesh_work_and_still_accepts_radius_changes() -> void:
+	var rope := add_to_tree(RopeScene.instantiate()) as Rope
+	rope.config = rope.config.duplicate() as RopeConfig
+	rope.begin_drag(24)
+	rope.end_drag()
+	rope._process(1.0 / 60.0)
+	assert_near(rope.get_last_mesh_ms(), 0.0, "held frames do no mesh work")
+	var renderer := rope.get_node("RopeRenderer") as RopeRenderer
+	var previous := renderer.mesh.get_aabb()
+	rope.config.radius *= 2.0
+	rope._process(1.0 / 60.0)
+	assert_true(renderer.mesh.get_aabb().size.z > previous.size.z, "radius remains adjustable when held")
+
+
+func test_radial_segments_can_change_after_circle_cache_is_built() -> void:
+	var renderer := add_to_tree(RopeRenderer.new()) as RopeRenderer
+	var points := RopeLayout.straight(Vector3.ZERO, Vector3.RIGHT, 1.0, 4)
+	renderer.update_mesh(points, 0.02)
+	renderer.radial_segments = 16
+	renderer.update_mesh(points, 0.02)
+	var arrays := renderer.mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	assert_eq(vertices.size(), (4 * renderer.subdivisions + 1 + renderer.cap_rings * 2) * 17, "cache follows radial count")
+	assert_near(renderer.mesh.get_aabb().size.y, 0.04, "updated ring has same diameter", 1e-3)

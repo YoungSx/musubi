@@ -16,6 +16,9 @@ var _simulation: RopeSimulation
 var _collision: RopeCollision
 var _accumulator := 0.0
 var _held := false
+var _last_simulation_ms := 0.0
+var _last_mesh_ms := 0.0
+var _rendered_radius := -1.0
 
 @onready var _renderer: RopeRenderer = $RopeRenderer
 
@@ -26,8 +29,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	advance(delta)
-	_renderer.update_mesh(_simulation.get_positions(), config.radius)
+	var started := Time.get_ticks_usec()
+	var steps := advance(delta)
+	_last_simulation_ms = float(Time.get_ticks_usec() - started) / 1000.0
+	_last_mesh_ms = 0.0
+	if steps > 0 or _rendered_radius != config.radius:
+		_refresh_mesh()
 
 
 ## Advances the simulation by wall-clock time using fixed steps. Returns the
@@ -58,7 +65,7 @@ func reset() -> void:
 	_accumulator = 0.0
 	_held = false
 	_sync_anchors()
-	_renderer.update_mesh(_simulation.get_positions(), config.radius)
+	_refresh_mesh()
 
 
 func get_simulation() -> RopeSimulation:
@@ -96,11 +103,26 @@ func end_drag() -> void:
 	_simulation.stop_motion()
 	_held = true
 	_accumulator = 0.0
-	_renderer.update_mesh(_simulation.get_positions(), config.radius)
+	_refresh_mesh()
 
 
 func is_held() -> bool:
 	return _held
+
+
+func get_last_simulation_ms() -> float:
+	return _last_simulation_ms
+
+
+func get_last_mesh_ms() -> float:
+	return _last_mesh_ms
+
+
+func _refresh_mesh() -> void:
+	var started := Time.get_ticks_usec()
+	_renderer.update_mesh(_simulation.get_positions(), config.radius)
+	_rendered_radius = config.radius
+	_last_mesh_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
 
 func _sync_anchors() -> void:

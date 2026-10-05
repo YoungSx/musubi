@@ -26,6 +26,7 @@ var _uvs := PackedVector2Array()
 var _indices := PackedInt32Array()
 var _indexed_rings := -1
 var _indexed_radial := -1
+var _unit_circle := PackedVector2Array()
 
 
 func _ready() -> void:
@@ -99,6 +100,11 @@ func _build_frames() -> void:
 
 
 func _build_vertices(radius: float) -> void:
+	if _unit_circle.size() != radial_segments + 1:
+		_unit_circle.resize(radial_segments + 1)
+		for j in radial_segments + 1:
+			var angle := TAU * float(j) / float(radial_segments)
+			_unit_circle[j] = Vector2(cos(angle), sin(angle))
 	var body := _centers.size()
 	var ring_count := body + cap_rings * 2
 	var stride := radial_segments + 1
@@ -132,8 +138,7 @@ func _build_vertices(radius: float) -> void:
 		var center := _centers[sample] + tangent * (axial * radius)
 		var v := (_arc[sample] + axial * radius) * uv_scale
 		for j in stride:
-			var angle := TAU * float(j) / float(radial_segments)
-			var radial := normal * cos(angle) + binormal * sin(angle)
+			var radial := normal * _unit_circle[j].x + binormal * _unit_circle[j].y
 			var index := ring * stride + j
 			_vertices[index] = center + radial * (scale * radius)
 			_normals[index] = radial * scale + tangent * axial

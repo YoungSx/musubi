@@ -59,7 +59,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 47 tests passed. A rendered scene smoke check exercised camera orbit,
+All 49 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -76,8 +76,10 @@ two-finger transitions, cancellation, focus loss and occluded picking.
   anchor removal and anchor Reset semantics: currently
   removing an anchor reference alone does not release its pin, and Reset
   rebuilds from current anchor positions.
-- Profile both solver and renderer on iPad. The renderer currently recreates
-  its mesh surface each display frame; array reuse does not eliminate engine
+- Profile both solver and renderer on iPad. Cached segment bounds and radial
+  trigonometry reduced Windows headless solver time about 15% and mesh work
+  about 21% in a same-process comparison. Held frames skip mesh updates.
+  The renderer recreates its mesh surface when simulation advances; array reuse does not eliminate engine
   or GPU allocations. Mobile performance and memory acceptance remain open.
 - iOS export/signing and physical touch remain unverified. Windows recognizes
   the USB-connected iPad, but this environment has no detected `xcrun` or
