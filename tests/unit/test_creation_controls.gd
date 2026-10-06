@@ -3,7 +3,7 @@ extends TestCase
 
 func test_length_presets_and_cross_configuration_scene_restore() -> void:
 	var app := _app()
-	for length_m in [1.4, 2.2, 3.0]:
+	for length_m in [1.4, 2.2, 3.0, 6.0]:
 		assert_true(app.new_rope(length_m), "preset accepted")
 		assert_near(app.rope.config.length, length_m, "correct rest length")
 		assert_true(app.rope.config.get_rest_length() <= 0.033, "particle density preserved")
@@ -34,6 +34,14 @@ func test_fix_release_endpoints_and_import_work_bound() -> void:
 	invalid.rope.simulation.config.solver_iterations = 64
 	assert_true(not MusubiSceneState.apply(app, invalid), "expensive untrusted configuration refused")
 	assert_eq(MusubiSceneState.capture(app), saved, "rejected import preserves scene")
+
+func test_long_shoulder_rope_places_slack_above_floor() -> void:
+	var config := RopeConfig.for_length(6.0)
+	var points := RopeLayout.shoulder_drape(config.length,config.segment_count)
+	assert_eq(points.size(),193,"long rope preserves spatial sampling")
+	for point in points:
+		assert_true(point.y >= config.radius,"long tails are laid on the floor rather than spawned below it")
+	assert_near(RopeLayout.polyline_length(points),6.0,"initial rope conserves length",0.04)
 
 
 func _app() -> AppController:

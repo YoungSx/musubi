@@ -33,6 +33,7 @@ func _ready() -> void:
 	menu.add_item("New rope · 1.4 m", 0)
 	menu.add_item("New rope · 2.2 m", 1)
 	menu.add_item("New rope · 3.0 m", 2)
+	menu.add_item("New rope · 6.0 m", 3)
 	menu.add_separator()
 	menu.add_item("Release A", 10)
 	menu.add_item("Release B", 11)
@@ -109,8 +110,8 @@ func set_rope_state(length_m: float, start_attached: bool, end_attached: bool) -
 
 
 func _rope_menu_selected(id: int) -> void:
-	if id >= 0 and id <= 2:
-		new_rope_requested.emit([1.4, 2.2, 3.0][id])
+	if id >= 0 and id <= 3:
+		new_rope_requested.emit([1.4, 2.2, 3.0, 6.0][id])
 	elif id == 10 or id == 11:
 		action_requested.emit(&"attachment_a" if id == 10 else &"attachment_b")
 

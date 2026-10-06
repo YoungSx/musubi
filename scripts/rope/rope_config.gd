@@ -48,6 +48,8 @@ static func for_length(length_m: float) -> RopeConfig:
 		result.segment_count = 72
 	elif is_equal_approx(length_m, 3.0):
 		result.segment_count = 96
+	elif is_equal_approx(length_m, 6.0):
+		result.segment_count = 192
 	else:
 		return null
 	result.length = length_m

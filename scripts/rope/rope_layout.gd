@@ -81,10 +81,27 @@ static func shoulder_drape(length: float, segment_count: int) -> PackedVector3Ar
 		Vector3(-0.1, 1.48, -0.08), Vector3(0, 1.48, -0.09),
 		Vector3(0.1, 1.48, -0.08), Vector3(0.23, 1.48, 0.03), Vector3(0.30, 1.15, 0.1)])
 	var tail := maxf((length - polyline_length(arch)) * 0.5, 0.02)
+	if tail > 1.12:
+		var left := _ground_tail(arch[0],tail,-1)
+		left.reverse()
+		left.append_array(arch)
+		left.append_array(_ground_tail(arch[-1],tail,1))
+		return resample(left,segment_count)
 	var points := PackedVector3Array([arch[0] + Vector3.DOWN * tail])
 	points.append_array(arch)
 	points.append(arch[-1] + Vector3.DOWN * tail)
 	return resample(points, segment_count)
+
+
+static func _ground_tail(origin: Vector3,length: float,side: float) -> PackedVector3Array:
+	var floor_y := 0.015
+	var slack := maxf(0,length-(origin.y-floor_y))
+	var points := PackedVector3Array([origin,Vector3(origin.x,floor_y,origin.z)])
+	var radius := 0.45
+	for i in range(1,65):
+		var angle := slack/radius*float(i)/64.0
+		points.append(Vector3(origin.x+side*radius*sin(angle),floor_y,origin.z+radius*(1-cos(angle))))
+	return points
 
 
 static func floor_curve(length: float, segment_count: int, radius: float) -> PackedVector3Array:
