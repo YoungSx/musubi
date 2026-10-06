@@ -17,6 +17,8 @@ var _target_marker := MeshInstance3D.new()
 var _target_lines := ImmediateMesh.new()
 var _target_line_node := MeshInstance3D.new()
 var _end_labels: Array[Label3D] = []
+var _support_marker := MeshInstance3D.new()
+var _hand_shadows: Array[MeshInstance3D] = []
 
 
 func configure(rope: Rope, mannequin: Mannequin, hud: Hud) -> void:
@@ -44,6 +46,29 @@ func configure(rope: Rope, mannequin: Mannequin, hud: Hud) -> void:
 	_marker.material_override = marker_material
 	_marker.visible = false
 	add_child(_marker)
+	_support_marker.mesh = marker_mesh
+	var support_material := marker_material.duplicate() as StandardMaterial3D
+	support_material.albedo_color = Color("efe8cf")
+	_support_marker.material_override = support_material
+	_support_marker.visible = false
+	add_child(_support_marker)
+	for hand in 2:
+		var shadow := MeshInstance3D.new()
+		var disk := CylinderMesh.new()
+		disk.top_radius = 0.04
+		disk.bottom_radius = 0.04
+		disk.height = 0.001
+		disk.radial_segments = 20
+		shadow.mesh = disk
+		var shade := StandardMaterial3D.new()
+		shade.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		shade.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		shade.albedo_color = Color(0, 0, 0, 0.22)
+		shadow.material_override = shade
+		shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		shadow.visible = false
+		add_child(shadow)
+		_hand_shadows.append(shadow)
 	_target_marker.mesh = marker_mesh
 	var target_material := marker_material.duplicate() as StandardMaterial3D
 	target_material.albedo_color = Color("79cbd1")
@@ -99,7 +124,16 @@ func _process(delta: float) -> void:
 	if _rope.end_anchor != null:
 		_rope.end_anchor.visible = _rope.is_end_attached()
 	var selected := sim.get_drag_index()
-	_hud.set_simulation_state(_rope.is_held(), selected >= 0)
+	_hud.set_simulation_state(_rope.is_held(), selected >= 0 or _rope.has_support())
+	_support_marker.visible = _rope.has_support() and _enabled
+	if _support_marker.visible:
+		_support_marker.global_position = sim.get_support_position()
+	for hand in 2:
+		var active := selected >= 0 if hand == 0 else _rope.has_support()
+		var point := sim.get_grip_position() if hand == 0 else sim.get_support_position()
+		_hand_shadows[hand].visible = play_mode and active and point.y < 0.5
+		if _hand_shadows[hand].visible:
+			_hand_shadows[hand].global_position = Vector3(point.x, 0.003, point.z)
 	_hud.set_rope_state(_rope.config.length, _rope.is_start_attached(), _rope.is_end_attached())
 	for side in 2:
 		_end_labels[side].visible = not play_mode or _enabled

@@ -36,12 +36,25 @@ func _ready() -> void:
 
 func handle_action(action: StringName) -> void:
 	match action:
+		&"ground":
+			interaction_manager.reset()
+			var before := rope.capture_scene_state()
+			rope.initial_layout = Rope.InitialLayout.FLOOR
+			rope.hold_on_release = false
+			rope.reset()
+			set_play_mode(true)
+			camera_rig.frame_ground()
+			_record_edit(before, rope.capture_scene_state())
 		&"advanced":
 			hud.set_advanced_visible(not hud.is_advanced_visible())
 		&"debug":
 			rope_debug.set_debug_enabled(not rope_debug.is_debug_enabled())
 		&"reset": reset()
-		&"focus": camera_rig.reset_view()
+		&"focus":
+			if play_mode and rope.initial_layout == Rope.InitialLayout.FLOOR:
+				camera_rig.frame_ground()
+			else:
+				camera_rig.reset_view()
 		&"back":
 			interaction_manager.reset()
 			camera_rig.turn_around()
@@ -57,7 +70,7 @@ func handle_action(action: StringName) -> void:
 			rope.set_endpoint_attached(side, not (rope.is_start_attached() if side == 0 else rope.is_end_attached()))
 			_record_edit(before, rope.capture_scene_state())
 		&"undo", &"redo":
-			if interaction_manager.get_selected_index() >= 0:
+			if interaction_manager.get_selected_index() >= 0 or rope.has_support():
 				interaction_manager.cancel_drag()
 				return
 			var changed := history.undo(self) if action == &"undo" else history.redo(self)
@@ -130,6 +143,8 @@ func reset() -> void:
 	_configure_collision()
 	rope.reset()
 	camera_rig.reset_view()
+	if rope.initial_layout == Rope.InitialLayout.FLOOR:
+		camera_rig.frame_ground()
 	$PerformanceCapture.recorder.reset()
 	rope_debug.refresh_collision(mannequin)
 	hud.set_status("")

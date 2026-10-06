@@ -41,11 +41,12 @@ func _ready() -> void:
 	play_menu.add_item("Start again", 0)
 	play_menu.add_item("Save", 1)
 	play_menu.add_item("Open", 2)
+	play_menu.add_item("Lay rope on ground", 5)
 	play_menu.add_separator()
 	play_menu.add_item("Advanced", 3)
 	if OS.is_debug_build():
 		play_menu.add_item("Debug", 4)
-	play_menu.id_pressed.connect(func(id: int): action_requested.emit([&"reset", &"save", &"load", &"advanced", &"debug"][id]))
+	play_menu.id_pressed.connect(func(id: int): action_requested.emit(&"ground" if id == 5 else [&"reset", &"save", &"load", &"advanced", &"debug"][id]))
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
 		_base_margins[side] = _safe_area.get_theme_constant(side)
 	get_viewport().size_changed.connect(_apply_safe_area)

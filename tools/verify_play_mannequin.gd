@@ -43,13 +43,13 @@ func _run() -> void:
 	var target_before := sim.get_drag_target()
 	var inspect := InputEventMouseButton.new()
 	inspect.device = ReplayInputGuard.DEVICE
-	inspect.button_index = MOUSE_BUTTON_RIGHT
+	inspect.button_index = MOUSE_BUTTON_MIDDLE
 	inspect.position = pointer * Vector2(root.size) / Vector2(1280, 800)
 	inspect.pressed = true
 	Input.parse_input_event(inspect)
 	_motion(pointer + Vector2(60, 20))
 	await _frames(20)
-	_check(app.interaction_manager.get_selected_index() >= 0, "right-drag inspection keeps the grip")
+	_check(app.interaction_manager.get_selected_index() >= 0, "middle-drag inspection keeps the grip")
 	inspect = inspect.duplicate()
 	inspect.pressed = false
 	inspect.position = pointer * Vector2(root.size) / Vector2(1280, 800)

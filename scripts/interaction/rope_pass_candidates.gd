@@ -87,7 +87,7 @@ func _build_loop(points: PackedVector3Array, radius: float, id: Vector3i, endpoi
 		if absf(offset.dot(normal)) > radius * 1.5:
 			return {}
 		polygon.append(Vector2(offset.dot(x), offset.dot(y)))
-	if not Geometry2D.is_point_in_polygon(Vector2.ZERO, polygon) or not _simple_polygon(polygon):
+	if not Geometry2D.is_point_in_polygon(Vector2.ZERO, polygon) or not is_simple_polygon(polygon):
 		return {}
 	var half_length := radius * config.corridor_radii
 	return {"id": id, "origin": center, "center": center, "normal": normal, "half_length": half_length,
@@ -162,7 +162,7 @@ func corridor_clear(points: PackedVector3Array, radius: float, center: Vector3, 
 	return true
 
 
-func _simple_polygon(polygon: PackedVector2Array) -> bool:
+static func is_simple_polygon(polygon: PackedVector2Array) -> bool:
 	for i in polygon.size():
 		var next_i := (i + 1) % polygon.size()
 		if polygon[i].distance_squared_to(polygon[next_i]) < 1e-12:

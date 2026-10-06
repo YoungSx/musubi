@@ -79,6 +79,15 @@ func turn_around() -> void:
 	_target.yaw += PI
 
 
+func frame_ground() -> void:
+	_target.focus = Vector3(0, 0.55, 0.3)
+	_target.yaw = deg_to_rad(config.yaw_degrees)
+	_target.pitch = deg_to_rad(55.0)
+	_target.distance = 4.5
+	_current.copy_from(_target)
+	_apply_current()
+
+
 func get_target_yaw() -> float:
 	return _target.yaw
 

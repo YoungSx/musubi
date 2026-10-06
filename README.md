@@ -8,7 +8,7 @@ in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
 The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: local pass assistance on the mannequin (0.5.0)
+## Current milestone: single-mouse ground play (0.6.0)
 
 The default scene retains the full mannequin and its limb/torso collisions.
 An unpinned rope rests naturally across its shoulders. Grab any visible portion
@@ -24,6 +24,12 @@ behavior. Play mode now offers conservative local pass-corridor assistance,
 including intent scoring and clear side passages around mannequin occlusion.
 Verified first-time-player Overhand/Half Hitch play is not implemented yet.
 See [pass assistance and its acceptance limits](docs/pass-assistance.md).
+
+Menu → **Lay rope on ground** starts a fixed-camera floor session in front of the
+full mannequin. Left-drag forms loops; a sustained approach into a loop can
+gently lift a local strand and guide the tip underneath. Release removes the
+temporary support and lets the rope settle. No second mouse button or depth
+control is required in this session. See [single-mouse design and verification](docs/mouse-ground-play.md).
 
 The capabilities below describe the shared core and advanced workbench:
 
@@ -109,6 +115,7 @@ godot --path . -s res://tools/verify_tightening.gd -- <output-directory>
 godot --path . -s res://tools/verify_wrap.gd -- <output-directory>
 godot --path . -s res://tools/verify_pass_assist.gd -- <output-directory>
 godot --path . -s res://tools/verify_play_mannequin.gd -- <output-directory>
+godot --path . -s res://tools/verify_mouse_ground.gd -- <output-directory>
 godot --path . -s res://tools/verify_creation_workflow.gd -- <output-directory>
 godot --headless --path . -s res://tools/benchmark_creation.gd
 godot --path . -s res://tools/verify_desktop_stability.gd
@@ -137,8 +144,8 @@ the Rope node's held/catch-up state are application data and are not included
 in this simulation snapshot. `MusubiSceneState` adds these fields for full
 creation files, validates before changing the live scene and replaces files
 only after a successful temporary-file write. Invalid files leave the scene intact.
-Simulation format v3 adds fractional grip and natural-release stabilization state;
-v1/v2 snapshots remain readable. Existing v1 creations load
+Simulation format v4 adds transient soft support to the v3 fractional-grip and
+natural-release state; v1/v2/v3 snapshots remain readable. Existing v1 creations load
 with self-contact disabled to preserve their behavior; Reset starts a new rope
 with the current default (enabled). Debug shows the active setting and last-pass
 contact count. See [self-contact implementation and verification](docs/rope-self-collision.md).

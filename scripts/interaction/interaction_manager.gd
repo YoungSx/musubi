@@ -17,6 +17,7 @@ var _rope_interaction := RopeInteraction.new()
 var _hover_index := -1
 var _hover_time := 0.0
 var _inspecting := false
+var play_enabled := false
 
 
 func _ready() -> void:
@@ -35,6 +36,7 @@ func _ready() -> void:
 
 
 func set_play_mode(enabled: bool) -> void:
+	play_enabled = enabled
 	_gestures.preserve_grip_during_inspection = enabled
 	_rope_interaction.set_pass_assist_enabled(enabled)
 
@@ -104,6 +106,7 @@ func get_selected_index() -> int:
 func reset() -> void:
 	_gestures.reset()
 	_rope_interaction.end()
+	rope.end_support()
 
 
 func _on_primary_started(position: Vector2) -> void:
@@ -114,6 +117,8 @@ func _on_primary_drag(position: Vector2, relative: Vector2) -> void:
 	if _rope_interaction.get_selected_index() >= 0:
 		_rope_interaction.move(position)
 	else:
+		if play_enabled and rope.initial_layout == Rope.InitialLayout.FLOOR:
+			return
 		camera_rig.orbit(_to_screen_units(relative))
 
 
@@ -123,6 +128,8 @@ func _on_primary_ended() -> void:
 
 
 func _on_secondary_drag(relative: Vector2) -> void:
+	if play_enabled and rope.initial_layout == Rope.InitialLayout.FLOOR:
+		return
 	if _inspecting:
 		camera_rig.orbit(_to_screen_units(relative))
 	else:
@@ -130,6 +137,8 @@ func _on_secondary_drag(relative: Vector2) -> void:
 
 
 func _on_zoom(factor: float) -> void:
+	if play_enabled and rope.initial_layout == Rope.InitialLayout.FLOOR:
+		return
 	if _rope_interaction.get_selected_index() >= 0 and not _inspecting:
 		_rope_interaction.adjust_depth(factor)
 	else:

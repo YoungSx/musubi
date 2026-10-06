@@ -144,6 +144,11 @@ func _leave() -> Vector3:
 	return _last_target
 
 
+func rebase_input(target: Vector3) -> void:
+	_last_raw = target
+	_last_target = target
+
+
 func validate_active(points: PackedVector3Array, radius: float, grip_u: float, collision: RopeCollision) -> bool:
 	if state == State.FREE:
 		return true

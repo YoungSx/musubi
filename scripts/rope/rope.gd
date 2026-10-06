@@ -11,7 +11,7 @@ extends Node3D
 @export var config: RopeConfig
 @export var start_anchor: Node3D
 @export var end_anchor: Node3D
-enum InitialLayout { HANGING, DRAPED }
+enum InitialLayout { HANGING, DRAPED, FLOOR }
 @export var initial_layout: InitialLayout = InitialLayout.HANGING
 @export var hold_on_release := true
 signal edit_completed(before: Dictionary, after: Dictionary)
@@ -81,6 +81,8 @@ func reset() -> void:
 	var points := RopeLayout.hanging(start, end, config.length, config.segment_count)
 	if initial_layout == InitialLayout.DRAPED:
 		points = RopeLayout.shoulder_drape(config.length, config.segment_count)
+	elif initial_layout == InitialLayout.FLOOR:
+		points = RopeLayout.floor_curve(config.length, config.segment_count, config.radius)
 	_simulation = RopeSimulation.new(config, points)
 	_simulation.set_collision(_collision)
 	_accumulator = 0.0
@@ -149,6 +151,8 @@ func begin_drag(index: int) -> bool:
 func begin_grip(material_u: float) -> bool:
 	if _simulation.get_drag_index() >= 0 or not is_finite(material_u) or material_u < 0 or material_u > 1:
 		return false
+	if has_support() and absf(material_u - _simulation.get_support_u()) * config.segment_count < 2.0:
+		return false
 	var before := capture_scene_state()
 	if material_u == 0.0 and _start_attached:
 		_start_attached = false
@@ -157,9 +161,9 @@ func begin_grip(material_u: float) -> bool:
 		_end_attached = false
 		_simulation.unpin(_simulation.get_point_count() - 1)
 	if not _simulation.begin_grip(material_u):
-		restore_scene_state(before)
 		return false
-	_drag_snapshot = before
+	if _drag_snapshot.is_empty():
+		_drag_snapshot = before
 	_held = false
 	_accumulator = 0.0
 	return true
@@ -172,12 +176,40 @@ func update_drag_target(target: Vector3) -> void:
 func end_drag() -> void:
 	if _simulation.get_drag_index() < 0:
 		return
-	var before := _drag_snapshot.duplicate(true)
 	if hold_on_release:
 		_simulation.end_drag()
 		_simulation.stop_motion()
 	else:
 		_simulation.release_grip()
+	_finish_hand_edit()
+
+
+func begin_support(u: float, lift: float) -> bool:
+	var before := capture_scene_state()
+	if not _simulation.begin_support(u):
+		return false
+	if _drag_snapshot.is_empty():
+		_drag_snapshot = before
+	_simulation.update_support_target(_simulation.get_support_position() + Vector3.UP * lift)
+	_held = false
+	return true
+
+
+func has_support() -> bool:
+	return _simulation.get_support_u() >= 0
+
+
+func end_support() -> void:
+	if not has_support():
+		return
+	_simulation.release_support()
+	_finish_hand_edit()
+
+
+func _finish_hand_edit() -> void:
+	if has_support() or _simulation.get_drag_index() >= 0:
+		return
+	var before := _drag_snapshot.duplicate(true)
 	_drag_snapshot.clear()
 	_held = hold_on_release
 	_accumulator = 0.0
@@ -203,6 +235,8 @@ func cancel_drag() -> void:
 func can_drag(index: int) -> bool:
 	if index < 0 or index >= _simulation.get_point_count():
 		return false
+	if has_support() and absf(index - _simulation.get_support_u() * config.segment_count) < 2.0:
+		return false
 	return not _simulation.is_pinned(index) or (index == 0 and _start_attached) or (index == _simulation.get_point_count() - 1 and _end_attached)
 
 
@@ -217,7 +251,7 @@ func is_end_attached() -> bool:
 ## Scene snapshots deliberately reject active gestures; a saved scene cannot
 ## recreate a physical pointer or its pre-grab cancellation history.
 func capture_scene_state() -> Dictionary:
-	if _simulation.get_drag_index() >= 0:
+	if _simulation.get_drag_index() >= 0 or has_support():
 		return {}
 	return {"simulation": _simulation.capture_state(), "held": _held,
 		"initial_layout": int(initial_layout), "hold_on_release": hold_on_release,
@@ -229,7 +263,7 @@ func capture_scene_state() -> Dictionary:
 ## Validate the whole payload before touching live nodes or simulation state.
 func validate_scene_state(data: Dictionary) -> bool:
 	var layout: Variant = data.get("initial_layout", 0)
-	if not (layout is int or layout is float) or (layout != 0 and layout != 1) or not data.get("hold_on_release", true) is bool:
+	if not (layout is int or layout is float) or (layout != 0 and layout != 1 and layout != 2) or not data.get("hold_on_release", true) is bool:
 		return false
 	if not data.get("simulation") is Dictionary or not data.get("held") is bool:
 		return false
@@ -239,7 +273,7 @@ func validate_scene_state(data: Dictionary) -> bool:
 	if not (accumulator is float or accumulator is int) or not is_finite(float(accumulator)):
 		return false
 	var state := RopeState.decode(data.simulation)
-	if state.is_empty() or state.drag_index != -1 or not state.config.is_scene_supported():
+	if state.is_empty() or state.drag_index != -1 or not state.support.is_empty() or not state.config.is_scene_supported():
 		return false
 	if accumulator < 0.0 or accumulator > state.config.get_time_step() + 1e-9 or (data.held and accumulator != 0.0):
 		return false

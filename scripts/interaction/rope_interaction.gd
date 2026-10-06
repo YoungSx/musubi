@@ -21,6 +21,10 @@ var _assist_enabled := false
 var _last_intent_usec := 0
 var _manual_depth_until_usec := 0
 var _validation_time := 0.0
+var _ground_hand := GroundHand.new()
+var _ground_intent := GroundPassIntent.new()
+var _owns_support := false
+var _ground_simulation_id := 0
 
 
 func set_pass_assist_enabled(enabled: bool) -> void:
@@ -38,6 +42,11 @@ func get_pass_state() -> RopePassAssist.State:
 
 
 func tick(delta: float) -> void:
+	if _owns_support:
+		var sim := _rope.get_simulation()
+		_ground_intent.observe_actual(sim.get_grip_position(), sim.get_positions(), _rope.config.radius)
+		if _ground_intent.support_u < 0 or not _ground_intent.validate_active(sim.get_positions(), _rope.config.radius):
+			_stop_support()
 	if not _assist_enabled or _selected_index < 0 or _pass_assist.state == RopePassAssist.State.FREE:
 		return
 	_validation_time -= delta
@@ -64,7 +73,10 @@ func begin(screen_position: Vector2) -> bool:
 	var coordinate := _picked_u * (_rope.get_simulation().get_point_count() - 1)
 	var base := floori(coordinate)
 	var point := _rope.get_simulation().get_point(base).lerp(_rope.get_simulation().get_point(mini(base + 1, _rope.get_simulation().get_point_count() - 1)), coordinate - base)
-	_drag_plane = Plane(_camera.global_basis.z.normalized(), point)
+	var floor_height := _rope.get_collision().floor_height if _rope.get_collision() != null else 0.0
+	_ground_hand.begin(point, floor_height)
+	_ground_hand.active = _ground_hand.active and _assist_enabled
+	_drag_plane = Plane(Vector3.UP if _ground_hand.active else _camera.global_basis.z.normalized(), point)
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection == null or not _rope.begin_grip(_picked_u):
 		return false
@@ -76,6 +88,11 @@ func begin(screen_position: Vector2) -> bool:
 	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
 	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
 	_camera_reference = _camera.global_transform
+	var simulation_id := _rope.get_simulation().get_instance_id()
+	if simulation_id != _ground_simulation_id:
+		_ground_intent.clear()
+		_ground_simulation_id = simulation_id
+	_ground_intent.begin(point)
 	_pass_assist.begin(point)
 	_last_intent_usec = Time.get_ticks_usec()
 	_manual_depth_until_usec = 0
@@ -86,16 +103,25 @@ func move(screen_position: Vector2) -> void:
 	if _selected_index < 0:
 		return
 	if not _camera_reference.is_equal_approx(_camera.global_transform):
-		rebase(_last_screen_position)
+		rebase(_last_screen_position, false)
+	var screen_delta := screen_position - _last_screen_position
 	_last_screen_position = screen_position
+	if screen_delta.length_squared() < 1e-10 and Time.get_ticks_usec() >= _manual_depth_until_usec:
+		return
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection != null:
 		var target := (intersection as Vector3) + _grab_offset
 		var now := Time.get_ticks_usec()
-		if _assist_enabled and now >= _manual_depth_until_usec:
-			var sim := _rope.get_simulation()
+		var dt := minf(float(now - _last_intent_usec) / 1000000.0, 0.1)
+		var sim := _rope.get_simulation()
+		var floor_height := _rope.get_collision().floor_height if _rope.get_collision() != null else 0.0
+		if _ground_hand.active:
+			target = _ground_intent.update(target, sim.get_grip_position(), sim.get_positions(), _picked_u, _rope.config.radius, floor_height, _rope.get_collision(), dt)
+			_sync_support()
+			target = _ground_hand.resolve(target, sim.get_positions(), _picked_u, _rope.config.radius, floor_height, _ground_intent.prefer_under, dt)
+		if _assist_enabled and not _ground_hand.active and now >= _manual_depth_until_usec:
 			target = _pass_assist.update(target, sim.get_grip_position(), sim.get_positions(), _rope.config.radius,
-				_picked_u, _camera.global_basis.z.normalized(), _rope.get_collision(), minf(float(now - _last_intent_usec) / 1000000.0, 0.1))
+				_picked_u, _camera.global_basis.z.normalized(), _rope.get_collision(), dt)
 		else:
 			_pass_assist.begin(target)
 		_last_intent_usec = now
@@ -106,11 +132,11 @@ func move(screen_position: Vector2) -> void:
 
 ## A camera move must not be interpreted as a hand move. Keep the requested
 ## world position, then rebuild the pointer offset in the new view.
-func rebase(screen_position: Vector2) -> void:
+func rebase(screen_position: Vector2, reset_assist := true) -> void:
 	if _selected_index < 0:
 		return
 	var target := _rope.get_simulation().get_drag_target()
-	_drag_plane = Plane(_camera.global_basis.z.normalized(), target)
+	_drag_plane = Plane(Vector3.UP if _ground_hand.active else _camera.global_basis.z.normalized(), target)
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection == null:
 		return
@@ -121,12 +147,18 @@ func rebase(screen_position: Vector2) -> void:
 	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
 	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
 	_camera_reference = _camera.global_transform
-	_pass_assist.begin(target)
+	_ground_intent.rebase(target)
+	if reset_assist:
+		_pass_assist.begin(target)
+	else:
+		_pass_assist.rebase_input(target)
 
 
 ## Wheel-up moves the active plane toward the viewer. Reachability and soft
 ## collision response remain solver responsibilities, including free ends.
 func adjust_depth(factor: float) -> void:
+	if _ground_hand.active:
+		return
 	if _selected_index < 0 or not is_finite(factor) or factor <= 0.0:
 		return
 	if not _camera_reference.is_equal_approx(_camera.global_transform):
@@ -144,6 +176,8 @@ func get_drag_depth() -> float:
 func end() -> void:
 	if _selected_index >= 0 and is_instance_valid(_rope):
 		_rope.end_drag()
+	_stop_support()
+	_ground_intent.begin(Vector3.ZERO)
 	_selected_index = -1
 	_pass_assist.begin(Vector3.ZERO)
 
@@ -154,8 +188,28 @@ func get_selected_index() -> int:
 
 func cancel() -> void:
 	_rope.cancel_drag()
+	_owns_support = false
+	_ground_intent.clear()
 	_selected_index = -1
 	_pass_assist.begin(Vector3.ZERO)
+
+
+func _sync_support() -> void:
+	if _ground_intent.support_u < 0:
+		_stop_support()
+		return
+	if not _owns_support:
+		_owns_support = _rope.begin_support(_ground_intent.support_u, 0.0)
+		if not _owns_support:
+			_ground_intent.abort()
+			return
+	_rope.get_simulation().update_support_target(_ground_intent.support_origin + Vector3.UP * 0.12 * _ground_intent.support_strength)
+
+
+func _stop_support() -> void:
+	if _owns_support and is_instance_valid(_rope):
+		_rope.end_support()
+	_owns_support = false
 
 
 func pick(screen_position: Vector2) -> int:

@@ -65,7 +65,7 @@ static func apply(app: Node, data: Dictionary) -> bool:
 	collision.configure(app.mannequin.config, app.mannequin.global_transform)
 	app.rope.set_collision(collision)
 	app.rope.restore_scene_state(data.rope)
-	app.set_play_mode(app.rope.initial_layout == Rope.InitialLayout.DRAPED)
+	app.set_play_mode(app.rope.initial_layout != Rope.InitialLayout.HANGING)
 	app.camera_rig.restore_state(data.camera)
 	return true
 

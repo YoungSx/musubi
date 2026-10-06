@@ -87,6 +87,14 @@ static func shoulder_drape(length: float, segment_count: int) -> PackedVector3Ar
 	return resample(points, segment_count)
 
 
+static func floor_curve(length: float, segment_count: int, radius: float) -> PackedVector3Array:
+	var points := PackedVector3Array()
+	for i in segment_count + 1:
+		var angle := PI * float(i) / segment_count
+		points.append(Vector3(-cos(angle) * length / PI, radius + 0.002, 0.45 + sin(angle) * length / PI))
+	return points
+
+
 static func _parabola(a: Vector3, span: Vector3, sag_dir: Vector3, depth: float) -> PackedVector3Array:
 	var points := PackedVector3Array()
 	points.resize(_FINE_SAMPLES + 1)
