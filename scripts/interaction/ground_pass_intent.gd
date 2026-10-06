@@ -10,13 +10,15 @@ var support_origin := Vector3.ZERO
 var support_strength := 0.0
 var prefer_under := false
 var confirmed_passes := 0
+var confirmed_exits := 0
 var topology := GroundLoopTopology.new()
+var choice := PassageChoice.new()
+
 var _candidate := {}
 var _last_raw := Vector2.ZERO
 var _direction := Vector2.ZERO
+var _velocity := Vector2.ZERO
 var _speed := 0.0
-var _dwell := 0.0
-var _distance_moved := 0.0
 var _query_time := 0.0
 var _loops: Array[Dictionary] = []
 var _recent_pass := {}
@@ -33,11 +35,12 @@ func begin(point: Vector3) -> void:
 	_candidate = {}
 	_last_raw = Vector2(point.x, point.z)
 	_direction = Vector2.ZERO
+	_velocity = Vector2.ZERO
 	_speed = 0
-	_dwell = 0
-	_distance_moved = 0
 	_query_time = 0
 	_loops.clear()
+	choice.clear()
+
 	_previous_actual = point
 	_last_output = point
 
@@ -46,6 +49,7 @@ func clear() -> void:
 	begin(Vector3.ZERO)
 	_recent_pass.clear()
 	confirmed_passes = 0
+	confirmed_exits = 0
 
 
 func rebase(point: Vector3) -> void:
@@ -67,10 +71,13 @@ func _update(raw: Vector3, actual: Vector3, points: PackedVector3Array, grip_u: 
 	if movement.length_squared() < 1e-12:
 		return _last_output
 	prefer_under = false
-	var speed := movement.length() / maxf(dt, 0.001)
+	# Filter velocity in elapsed time, not normalized per-frame directions:
+	# small high-frequency hand jitter must not outweigh sustained travel.
+	_velocity = _velocity.lerp(movement/maxf(dt,0.001),1.0-exp(-dt/0.075))
+	var speed := _velocity.length()
 	var continuity := minf(speed, _speed) / maxf(maxf(speed, _speed), 0.001) if _speed > 0 else 1.0
 	_speed = lerpf(_speed, speed, 0.3)
-	_direction = _direction.lerp(movement.normalized(), 0.4).normalized()
+	_direction = _velocity.normalized()
 	var tip := Vector2(actual.x, actual.z)
 	observe_actual(actual, points, radius)
 	if support_u >= 0:
@@ -80,7 +87,7 @@ func _update(raw: Vector3, actual: Vector3, points: PackedVector3Array, grip_u: 
 		var entry: Vector2 = _candidate.entry
 		var normal: Vector2 = _candidate.normal
 		var side := (tip - entry).dot(normal)
-		if (movement.normalized().dot(normal) < -0.5 and side < -radius * 3) or tip.distance_to(entry) > 0.22:
+		if (_direction.dot(normal) < -0.5 and side < -radius * 3) or tip.distance_to(entry) > 0.22:
 			_drop()
 			return raw
 		if phase == Phase.PULL and side > 0.10:
@@ -107,32 +114,14 @@ func _update(raw: Vector3, actual: Vector3, points: PackedVector3Array, grip_u: 
 		_loops = topology.observe(points, radius, floor_height)
 		_query_time = 0.08
 	var candidates := topology.entries(_loops, points, actual, _direction, grip_u, radius, collision)
-	var winner := {}
-	var best := -INF
-	var second := -INF
-	for candidate in candidates:
-		var score: float = candidate.alignment * 0.45 + continuity * 0.2 + (1.0 - candidate.distance / 0.18) * 0.25 + 0.1
-		if score > best:
-			second = best
-			best = score
-			winner = candidate
-		else:
-			second = maxf(second, score)
-	if winner.is_empty() or best < 0.7 or best - second < 0.1:
-		_dwell = maxf(0.0, _dwell - dt * 2)
-		confidence = _dwell / 0.12
-		phase = Phase.FREE
-		return raw
-	if _candidate.is_empty() or winner.loop.id != _candidate.loop.id or absf(float(winner.u) - float(_candidate.u)) * (points.size() - 1) > 3:
-		_dwell = 0
-		_distance_moved = 0
-	_candidate = winner
-	_dwell += minf(dt, 0.04)
-	_distance_moved += movement.length()
-	confidence = clampf(_dwell / 0.12, 0, 1)
-	phase = Phase.APPROACH
-	if confidence >= 1.0 and _distance_moved > radius:
-		_activate(winner, actual)
+	# Continuing through the opposite wall is Pull, not an automatic undo.
+	# An exit assist must retrace an observed entrance with reversed intent.
+	candidates = candidates.filter(func(c: Dictionary): return not c.get("exiting",false) or (not _recent_pass.is_empty() and absf(float(c.u)-float(_recent_pass.u))*(points.size()-1) < 5 and _direction.dot(_recent_pass.normal) < -0.5))
+	var winner := choice.update(candidates,continuity,movement.length(),dt,points.size()-1,radius)
+	confidence = choice.confidence
+	phase = Phase.APPROACH if confidence > 0 else Phase.FREE
+	if not winner.is_empty():
+		_activate(winner,actual)
 	return raw
 
 
@@ -151,7 +140,7 @@ func _drop() -> void:
 	prefer_under = false
 	_candidate = {}
 	phase = Phase.FREE
-	_dwell = 0
+	choice.clear()
 	confidence = 0
 
 
@@ -163,25 +152,32 @@ func observe_actual(actual: Vector3, points: PackedVector3Array, radius: float) 
 	if support_u >= 0 and not _candidate.is_empty():
 		var coordinate := support_u * (points.size() - 1)
 		var index := mini(floori(coordinate), points.size() - 2)
-		var a := Vector2(points[index].x, points[index].z)
-		var b := Vector2(points[index + 1].x, points[index + 1].z)
-		var before := Vector2(_previous_actual.x, _previous_actual.z)
-		var after := Vector2(actual.x, actual.z)
-		var hit: Variant = Geometry2D.segment_intersects_segment(before, after, a, b)
-		if hit != null:
-			var p: Vector2 = hit
-			var t := clampf((p - a).dot(b - a) / maxf(a.distance_squared_to(b), 1e-10), 0, 1)
-			var edge_y := lerpf(points[index].y, points[index + 1].y, t)
-			var height_clear := maxf(actual.y, _previous_actual.y) + radius * 1.8 < edge_y
-			var forward := (after - before).dot(_candidate.normal)
-			if height_clear and forward > 0 and not _candidate.get("passed", false) and Geometry2D.is_point_in_polygon(after + (_candidate.normal as Vector2) * radius * 0.5, _candidate.loop.polygon):
-				_candidate.passed = true
-				phase = Phase.PULL
-				confirmed_passes += 1
-				_recent_pass = _candidate.duplicate(true)
-			elif height_clear and forward < 0 and phase == Phase.UNWIND:
-				_recent_pass.clear()
-				_drop()
+		for contact_index in range(maxi(0,index-3),mini(points.size()-1,index+4)):
+			var a := Vector2(points[contact_index].x, points[contact_index].z)
+			var b := Vector2(points[contact_index + 1].x, points[contact_index + 1].z)
+			var before := Vector2(_previous_actual.x, _previous_actual.z)
+			var after := Vector2(actual.x, actual.z)
+			var hit: Variant = Geometry2D.segment_intersects_segment(before, after, a, b)
+			if hit != null:
+				var p: Vector2 = hit
+				var t := clampf((p - a).dot(b - a) / maxf(a.distance_squared_to(b), 1e-10), 0, 1)
+				var edge_y := lerpf(points[contact_index].y, points[contact_index + 1].y, t)
+				var height_clear := maxf(actual.y, _previous_actual.y) + radius * 1.8 < edge_y
+				var forward := (after - before).dot(_candidate.normal)
+				var inside := Geometry2D.is_point_in_polygon(after + (_candidate.normal as Vector2) * radius * 0.5, _candidate.loop.polygon)
+				if height_clear and forward > 0 and not _candidate.get("passed", false) and inside != _candidate.get("exiting",false):
+					_candidate.passed = true
+					phase = Phase.PULL
+					if _candidate.get("exiting",false):
+						confirmed_exits += 1
+						_recent_pass.clear()
+					else:
+						confirmed_passes += 1
+						_recent_pass = _candidate.duplicate(true)
+				elif height_clear and forward < 0 and phase == Phase.UNWIND:
+					_recent_pass.clear()
+					_drop()
+					break
 	_previous_actual = actual
 
 
@@ -189,6 +185,19 @@ func validate_active(points: PackedVector3Array, radius: float) -> bool:
 	if support_u < 0:
 		return true
 	var loop: Dictionary = _candidate.loop
+	if loop.get("face",false):
+		var at := support_u*(points.size()-1)
+		var edge := mini(floori(at),points.size()-2)
+		var supported := points[edge].lerp(points[edge+1],at-edge)
+		if Vector2(supported.x,supported.z).distance_to(_candidate.entry) > radius*5:
+			_drop()
+			return false
+		for face in GroundFaces.new().observe(points,radius,loop.get("floor_height",0)):
+			if face.center.distance_to(loop.center) < radius*4 and absf(face.first-loop.first) <= 2 and absf(face.last-loop.last) <= 2:
+				_candidate.loop = face
+				return true
+		_drop()
+		return false
 	var i := floori(loop.first)
 	var j := floori(loop.last)
 	var closure_exists := false

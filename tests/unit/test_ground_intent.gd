@@ -92,3 +92,51 @@ func test_missing_closure_releases_support() -> void:
 func test_open_floor_rope_is_not_a_loop() -> void:
 	var points := RopeLayout.floor_curve(2.2,72,0.012)
 	assert_true(GroundLoopTopology.new().observe(points,0.012,0).is_empty(),"ordinary open curve is not recognized as a passage")
+
+func test_multi_channel_scores_survive_jitter_but_not_a_changed_intent() -> void:
+	var selection := PassageChoice.new()
+	var a := _candidate()
+	var b := _candidate(Vector2i(3,12))
+	var selected := {}
+	for frame in 18:
+		a.alignment = 0.9 if frame%2 == 0 else 1.0
+		b.alignment = 1.0 if frame%2 == 0 else 0.9
+		selected = selection.update([a,b],1,0.003,1.0/60,72,0.012)
+	assert_true(selected.is_empty(),"jitter between equally plausible exits cannot select one")
+	assert_eq(selection.tracks.size(),2,"both hypotheses retained rather than first-hit selection")
+	b.alignment = 0.2
+	a.alignment = 1.0
+	for frame in 30: selected = selection.update([a,b],1,0.003,1.0/60,72,0.012)
+	assert_eq(selected.loop.id,a.loop.id,"clear sustained trajectory selects the intended corridor")
+	for frame in 30: selection.update([],1,0.003,1.0/60,72,0.012)
+	assert_true(selection.tracks.is_empty(),"departed channels cannot keep attracting the tip")
+
+func test_arrangement_discovers_multiple_mixed_material_channels() -> void:
+	var path := PackedVector3Array()
+	for p in [Vector2(-0.7,0),Vector2(-0.4,0.2),Vector2(-0.2,0.2),Vector2(-0.2,-0.2),Vector2(-0.5,-0.2),Vector2(-0.5,0.15),Vector2(0,0.15),Vector2(0.2,0.3),Vector2(0.5,0.3),Vector2(0.5,-0.1),Vector2(0.1,-0.1),Vector2(0.1,0.25),Vector2(0.65,0.25)]:
+		path.append(Vector3(p.x,0.03,p.y))
+	var faces := GroundFaces.new().observe(RopeLayout.resample(path,96),0.012,0)
+	assert_true(faces.size() >= 2,"intersecting arcs yield multiple bounded passage cells")
+	for face in faces:
+		assert_true(Geometry2D.is_point_in_polygon(face.center,face.polygon),"candidate center lies inside its own cell")
+
+func test_shared_entrances_merge_and_inside_motion_can_exit() -> void:
+	var points := PackedVector3Array([Vector3(-0.05,0.012,0),Vector3(-0.2,0.012,-0.3),Vector3(-0.3,0.012,-0.4),Vector3(-0.2,0.1,-0.4),Vector3(0,0.1,-0.1),Vector3(0,0.1,0.1),Vector3(0.2,0.1,0.1),Vector3(0.2,0.1,-0.1)])
+	var loop: Dictionary = _candidate().loop
+	loop.first = 4.0
+	loop.last = 5.0
+	loop.face = true
+	var overlapping := loop.duplicate(true)
+	overlapping.id = Vector2i(4,9)
+	var topology := GroundLoopTopology.new()
+	var candidates := topology.entries([loop,overlapping],points,points[0],Vector2.RIGHT,0,0.012,null)
+	assert_eq(candidates.size(),1,"one physical opening is not two ambiguous choices")
+	var inside := Vector3(0.05,0.012,0)
+	var exits := topology.entries([loop],points,inside,Vector2.LEFT,0,0.012,null)
+	assert_eq(exits.size(),1,"the tip can leave a cell without selecting a new tool")
+	assert_true(exits[0].exiting,"exit carries its geometric orientation")
+	var intent := GroundPassIntent.new()
+	intent.begin(inside)
+	intent._activate(exits[0],inside)
+	intent.observe_actual(Vector3(-0.05,0.012,0),points,0.012)
+	assert_eq(intent.confirmed_exits,1,"exit requires a real below-strand crossing")

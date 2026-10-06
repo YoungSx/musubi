@@ -29,6 +29,7 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_pass_assist.gd",
 	"res://tests/unit/test_support_constraints.gd",
 	"res://tests/unit/test_ground_intent.gd",
+	"res://tests/unit/test_surface_intent.gd",
 ]
 
 

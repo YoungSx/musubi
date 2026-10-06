@@ -43,7 +43,7 @@ func handle_action(action: StringName) -> void:
 			rope.hold_on_release = false
 			rope.reset()
 			set_play_mode(true)
-			camera_rig.frame_ground()
+			camera_rig.frame_ground(rope.config.length)
 			_record_edit(before, rope.capture_scene_state())
 		&"advanced":
 			hud.set_advanced_visible(not hud.is_advanced_visible())
@@ -52,7 +52,7 @@ func handle_action(action: StringName) -> void:
 		&"reset": reset()
 		&"focus":
 			if play_mode and rope.initial_layout == Rope.InitialLayout.FLOOR:
-				camera_rig.frame_ground()
+				camera_rig.frame_ground(rope.config.length)
 			else:
 				camera_rig.reset_view()
 		&"back":
@@ -104,6 +104,8 @@ func new_rope(length_m: float) -> bool:
 	var before := rope.capture_scene_state()
 	var changed := rope.new_rope(length_m)
 	if changed:
+		if rope.initial_layout == Rope.InitialLayout.FLOOR:
+			camera_rig.frame_ground(rope.config.length)
 		_record_edit(before, rope.capture_scene_state())
 		_last_creation_path = ""
 		$PerformanceCapture.recorder.reset()
@@ -144,7 +146,7 @@ func reset() -> void:
 	rope.reset()
 	camera_rig.reset_view()
 	if rope.initial_layout == Rope.InitialLayout.FLOOR:
-		camera_rig.frame_ground()
+		camera_rig.frame_ground(rope.config.length)
 	$PerformanceCapture.recorder.reset()
 	rope_debug.refresh_collision(mannequin)
 	hud.set_status("")

@@ -79,11 +79,12 @@ func turn_around() -> void:
 	_target.yaw += PI
 
 
-func frame_ground() -> void:
-	_target.focus = Vector3(0, 0.55, 0.3)
+func frame_ground(rope_length := 2.2) -> void:
+	var extra := maxf(0,rope_length-2.2)
+	_target.focus = Vector3(0, 0.55, 0.3+extra*0.25)
 	_target.yaw = deg_to_rad(config.yaw_degrees)
 	_target.pitch = deg_to_rad(55.0)
-	_target.distance = 4.5
+	_target.distance = minf(config.max_distance,4.5+extra*0.5)
 	_current.copy_from(_target)
 	_apply_current()
 

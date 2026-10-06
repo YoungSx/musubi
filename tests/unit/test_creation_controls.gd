@@ -43,6 +43,16 @@ func test_long_shoulder_rope_places_slack_above_floor() -> void:
 		assert_true(point.y >= config.radius,"long tails are laid on the floor rather than spawned below it")
 	assert_near(RopeLayout.polyline_length(points),6.0,"initial rope conserves length",0.04)
 
+func test_long_floor_rope_fits_before_interaction() -> void:
+	var app := _app()
+	app.handle_action(&"ground")
+	app.new_rope(6.0)
+	var camera := app.camera_rig.get_camera()
+	var frame := camera.get_viewport().get_visible_rect().grow(-16)
+	for point in app.rope.get_simulation().get_positions():
+		assert_true(frame.has_point(camera.unproject_position(point)),"long rope starts inside the fixed view")
+	assert_true(frame.has_point(camera.unproject_position(Vector3(0,1.75,0))),"full mannequin remains framed")
+
 
 func _app() -> AppController:
 	var app := add_to_tree(load("res://scenes/main/main.tscn").instantiate()) as AppController

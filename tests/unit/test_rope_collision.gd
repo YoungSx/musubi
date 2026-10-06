@@ -1,5 +1,16 @@
 extends TestCase
 
+func test_surface_ray_uses_same_body_clearance_without_floor_hit() -> void:
+	var part := _part(MannequinPart.Primitive.SPHERE)
+	var collision := _collision(part)
+	var hit := collision.trace_surface(Vector3(0,0,2),Vector3.FORWARD,4,0.012)
+	assert_true(not hit.is_empty(),"front surface found")
+	assert_near(collision.get_clearance(hit.position),0.012,"ray target has rope-radius clearance",0.0001)
+	assert_true(hit.normal.dot(Vector3.BACK) > 0.99,"front normal faces the viewer")
+	var back := collision.trace_surface(Vector3(0,0,-2),Vector3.BACK,4,0.012)
+	assert_true(back.position.z < 0,"reverse ray finds the rear surface")
+	assert_true(collision.trace_surface(Vector3(3,2,2),Vector3.DOWN,4,0.012).is_empty(),"floor is not treated as a mannequin surface")
+
 
 func test_sphere_capsule_and_box_project_outward() -> void:
 	for primitive in [MannequinPart.Primitive.SPHERE, MannequinPart.Primitive.CAPSULE, MannequinPart.Primitive.BOX]:

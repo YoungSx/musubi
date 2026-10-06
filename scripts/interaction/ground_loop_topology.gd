@@ -48,6 +48,13 @@ func observe(points: PackedVector3Array, radius: float, floor_height: float) -> 
 				"polygon": polygon, "center": center, "over": i + t if first_y > last_y else j + u})
 			if loops.size() > 8:
 				return [] # Ambiguous dense geometry is not assigned an arbitrary loop.
+	# Mixed-arc cells in a tightened knot are not necessarily one simple
+	# material loop. Add bounded faces while retaining stable existing IDs.
+	for face in GroundFaces.new().observe(points,radius,floor_height):
+		var duplicate := false
+		for loop in loops:
+			if loop.center.distance_to(face.center) < radius*3: duplicate = true
+		if not duplicate: loops.append(face)
 	return loops
 
 
@@ -59,10 +66,9 @@ func entries(loops: Array[Dictionary], points: PackedVector3Array, tip: Vector3,
 	if grip_u > 0.025 and grip_u < 0.975:
 		return result
 	for loop in loops:
-		if coordinate >= loop.first - 0.5 and coordinate <= loop.last + 0.5:
+		if not loop.get("face",false) and coordinate >= loop.first - 0.5 and coordinate <= loop.last + 0.5:
 			continue
-		if Geometry2D.is_point_in_polygon(start, loop.polygon):
-			continue
+		var exiting := Geometry2D.is_point_in_polygon(start,loop.polygon)
 		for k in range(floori(loop.first), mini(ceili(loop.last), points.size() - 1)):
 			if absf(k - coordinate) < 4:
 				continue
@@ -72,7 +78,7 @@ func entries(loops: Array[Dictionary], points: PackedVector3Array, tip: Vector3,
 			if hit == null:
 				continue
 			var entry: Vector2 = hit
-			if not Geometry2D.is_point_in_polygon(entry + direction * radius * 1.5, loop.polygon):
+			if Geometry2D.is_point_in_polygon(entry + direction * radius * 1.5, loop.polygon) == exiting:
 				continue
 			var t := clampf((entry - a).dot(b - a) / maxf(a.distance_squared_to(b), 1e-10), 0, 1)
 			var world := points[k].lerp(points[k + 1], t)
@@ -83,11 +89,12 @@ func entries(loops: Array[Dictionary], points: PackedVector3Array, tip: Vector3,
 			if normal.dot(direction) < 0: normal = -normal
 			var distance := start.distance_to(entry)
 			var candidate := {"loop": loop, "edge": k, "u": (k + t) / float(points.size() - 1),
+				"exiting":exiting,
 				"entry": entry, "world": world, "normal": normal,
 				"alignment": direction.dot(normal), "distance": distance}
 			var duplicate := false
 			for index in result.size():
-				if result[index].loop.id == loop.id and result[index].entry.distance_to(entry) < radius * 2:
+				if absf(float(result[index].u)-float(candidate.u))*(points.size()-1) < 1.5 and result[index].entry.distance_to(entry) < radius * 2 and result[index].normal.dot(normal) > 0.9:
 					if candidate.alignment > result[index].alignment: result[index] = candidate
 					duplicate = true
 					break

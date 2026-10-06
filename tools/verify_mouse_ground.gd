@@ -5,6 +5,7 @@ var pointer := Vector2.ZERO
 var failures := 0
 var left_down := false
 var motion_scale := 1.0
+var jitter := false
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -14,10 +15,19 @@ func _run() -> void:
 	if args.is_empty():
 		quit(1)
 		return
-	if args.size() > 1: motion_scale = clampf(float(args[1]), 0.5, 2.0)
+	if args.size() > 1 and args[1].is_valid_float(): motion_scale = clampf(float(args[1]), 0.5, 2.0)
+	jitter = "--jitter" in args
 	app = load("res://scenes/main/play.tscn").instantiate()
 	root.add_child(app)
 	ReplayInputGuard.install(self)
+	for arg in args:
+		if arg.begins_with("--resume="):
+			_check(app.load_creation(arg.trim_prefix("--resume=")),"restore knot from prior mouse replay")
+			app.hud.visible = false
+			await _frames(1)
+			await _unwind(args[0])
+			quit(1 if failures else 0)
+			return
 	app.hud.get_node("%PlayMenu").get_popup().id_pressed.emit(5)
 	app.hud.visible = false # Core gestures must work without any UI.
 	await _frames(180)
@@ -74,8 +84,28 @@ func _run() -> void:
 	var order := _crossing_order()
 	print("Crossing order: ", order)
 	_check(order == [-1, 2, -3, 1, -2, 3], "fixture retains alternating crossing order after settling")
+	if "--unwind" in args:
+		MusubiSceneState.write_file(args[0].path_join("mouse-knot.musubi"),MusubiSceneState.capture(app))
+		await _unwind(args[0])
 	print("Ground replay failures: ", failures)
 	quit(1 if failures else 0)
+
+
+func _unwind(output: String) -> void:
+	pointer = Vector2(750,525)
+	_button(MOUSE_BUTTON_LEFT,true)
+	await _frames(1)
+	_check(app.interaction_manager.get_selected_index() >= 0,"pick tightened end for natural unwind")
+	print("Grip u=",app.interaction_manager._rope_interaction._picked_u," ground=",app.interaction_manager._rope_interaction._ground_hand.active)
+	for destination in [Vector2(680,580),Vector2(680,610),Vector2(680,660),Vector2(610,680),Vector2(500,650),Vector2(460,540)]:
+		await _drag_to(destination,90)
+		print("Unwind pointer=",pointer," crossings=",_crossings()," phase=",app.interaction_manager._rope_interaction._ground_intent.phase," completed=",app.interaction_manager._rope_interaction._ground_intent.confirmed_exits," tip=",app.camera_rig.get_camera().unproject_position(app.rope.get_simulation().get_grip_position()))
+		await _capture(output,"unwind-%d-%d" % [pointer.x,pointer.y])
+	_button(MOUSE_BUTTON_LEFT,false)
+	await _frames(120)
+	await _capture(output,"ground-unwound")
+	print("Remaining crossing order: ",_crossing_order())
+	_check(_crossings() == 0,"reverse mouse motion removes crossings without reset or undo")
 
 func _frames(count: int) -> void:
 	for i in count: await process_frame
@@ -94,6 +124,8 @@ func _drag_to(destination: Vector2, frames: int) -> void:
 	var start := pointer
 	for frame in frames:
 		var position := start.lerp(destination, float(frame + 1) / frames)
+		if jitter and frame+1 < frames:
+			position += Vector2(sin(frame*0.9),cos(frame*0.7))*2.0
 		var event := InputEventMouseMotion.new()
 		event.device = ReplayInputGuard.DEVICE
 		event.position = position * Vector2(root.size) / Vector2(1280, 800)

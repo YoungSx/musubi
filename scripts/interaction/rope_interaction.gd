@@ -25,6 +25,8 @@ var _ground_hand := GroundHand.new()
 var _ground_intent := GroundPassIntent.new()
 var _owns_support := false
 var _ground_simulation_id := 0
+var _ground_validation_time := 0.0
+var _surface_intent := SurfaceIntent.new()
 
 
 func set_pass_assist_enabled(enabled: bool) -> void:
@@ -42,11 +44,15 @@ func get_pass_state() -> RopePassAssist.State:
 
 
 func tick(delta: float) -> void:
-	if _owns_support:
+	if _selected_index >= 0 and _ground_hand.active:
 		var sim := _rope.get_simulation()
 		_ground_intent.observe_actual(sim.get_grip_position(), sim.get_positions(), _rope.config.radius)
-		if _ground_intent.support_u < 0 or not _ground_intent.validate_active(sim.get_positions(), _rope.config.radius):
+		_ground_validation_time -= delta
+		if _owns_support and _ground_intent.support_u < 0:
 			_stop_support()
+		elif _owns_support and _ground_validation_time <= 0:
+			_ground_validation_time = 0.05
+			if not _ground_intent.validate_active(sim.get_positions(),_rope.config.radius): _stop_support()
 	if not _assist_enabled or _selected_index < 0 or _pass_assist.state == RopePassAssist.State.FREE:
 		return
 	_validation_time -= delta
@@ -93,6 +99,7 @@ func begin(screen_position: Vector2) -> bool:
 		_ground_intent.clear()
 		_ground_simulation_id = simulation_id
 	_ground_intent.begin(point)
+	_surface_intent.begin(point,screen_position)
 	_pass_assist.begin(point)
 	_last_intent_usec = Time.get_ticks_usec()
 	_manual_depth_until_usec = 0
@@ -115,11 +122,18 @@ func move(screen_position: Vector2) -> void:
 		var dt := minf(float(now - _last_intent_usec) / 1000000.0, 0.1)
 		var sim := _rope.get_simulation()
 		var floor_height := _rope.get_collision().floor_height if _rope.get_collision() != null else 0.0
-		if _ground_hand.active:
+		if _assist_enabled and (_picked_u <= 0.025 or _picked_u >= 0.975):
+			target = _surface_intent.update(screen_position,_camera,target,_rope.config.radius,_rope.get_collision(),sim.get_grip_position())
+		if _surface_intent.active:
+			_stop_support()
+			if _ground_hand.active: _ground_intent.clear()
+			_ground_hand.active = false
+			_ground_intent.abort()
+		elif _ground_hand.active:
 			target = _ground_intent.update(target, sim.get_grip_position(), sim.get_positions(), _picked_u, _rope.config.radius, floor_height, _rope.get_collision(), dt)
 			_sync_support()
 			target = _ground_hand.resolve(target, sim.get_positions(), _picked_u, _rope.config.radius, floor_height, _ground_intent.prefer_under, dt)
-		if _assist_enabled and not _ground_hand.active and now >= _manual_depth_until_usec:
+		if _assist_enabled and not _ground_hand.active and not _surface_intent.active and now >= _manual_depth_until_usec:
 			target = _pass_assist.update(target, sim.get_grip_position(), sim.get_positions(), _rope.config.radius,
 				_picked_u, _camera.global_basis.z.normalized(), _rope.get_collision(), dt)
 		else:
@@ -198,6 +212,8 @@ func _sync_support() -> void:
 	if _ground_intent.support_u < 0:
 		_stop_support()
 		return
+	if _owns_support and absf(_rope.get_simulation().get_support_u()-_ground_intent.support_u) > 0.00001:
+		_stop_support()
 	if not _owns_support:
 		_owns_support = _rope.begin_support(_ground_intent.support_u, 0.0)
 		if not _owns_support:

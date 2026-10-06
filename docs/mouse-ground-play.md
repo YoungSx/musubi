@@ -1,4 +1,4 @@
-# Single-mouse ground play (0.6.0)
+# Single-mouse ground play (0.7.0)
 
 ## Player contract
 
@@ -79,3 +79,12 @@ motion-duration rendered replays both preserved crossing order
 approximately 0.35% and 0.37%, respectively. Existing full-mannequin play and
 controlled spatial pass replays also passed. This does not establish mobile
 performance or first-time-player usability.
+
+0.7 extends this with bounded planar face discovery, persistent candidate scores,
+physical-entrance deduplication and time-based velocity filtering. The same
+screen-space sequence with `1 --jitter` adds two-pixel motion perturbations and
+also preserves the alternating crossing order. See the [complex-case report](complex-case-feasibility.md)
+for the still-failing tightened-knot unwind and full-mannequin lattice gates.
+Nintendo NERD's [gesture-filtering report](https://www.nerd.nintendo.com/2022/04/29/Switch_Sports.html)
+is a design reference for input robustness, not a claim that Musubi uses
+Nintendo's sensor fusion implementation.

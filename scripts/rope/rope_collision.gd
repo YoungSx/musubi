@@ -11,6 +11,7 @@ const MAX_MOTION_SAMPLES := 64
 var floor_enabled := true
 var floor_height := 0.0
 var _parts: Array[Collider] = []
+var _bounds := AABB()
 
 
 class Collider:
@@ -83,6 +84,7 @@ class Collider:
 
 func configure(config: MannequinConfig, world_transform := Transform3D.IDENTITY, ground_height := 0.0) -> void:
 	_parts.clear()
+	_bounds = AABB()
 	floor_height = ground_height
 	if config == null:
 		return
@@ -101,6 +103,7 @@ func configure(config: MannequinConfig, world_transform := Transform3D.IDENTITY,
 		collider.half_box = part.box_size * scale.x * 0.5
 		var extent := collider.half_box if part.primitive == MannequinPart.Primitive.BOX else Vector3(collider.radius, collider.half_axis + collider.radius, collider.radius)
 		collider.bounds = collider.transform * AABB(-extent, extent * 2.0)
+		_bounds = collider.bounds if _parts.is_empty() else _bounds.merge(collider.bounds)
 		_parts.append(collider)
 
 
@@ -112,11 +115,38 @@ func get_clearance(point: Vector3) -> float:
 	return result
 
 
+## Read-only body query shared by interaction; no physics-server timing or
+## duplicate collision geometry. Bounded sphere tracing of convex primitives.
+func trace_surface(origin: Vector3,direction: Vector3,distance: float,radius: float) -> Dictionary:
+	var nearest := distance
+	var result := {}
+	for part in _parts:
+		var hit: Variant = part.bounds.grow(radius+SKIN).intersects_ray(origin,direction)
+		if hit == null: continue
+		var travel := maxf(0,((hit as Vector3)-origin).dot(direction))
+		for step in 64:
+			if travel > nearest: break
+			var point := origin+direction*travel
+			var clearance := part.clearance(point)-radius
+			if clearance < 0.00001:
+				var epsilon := 0.0001
+				var normal := Vector3(part.clearance(point+Vector3.RIGHT*epsilon)-part.clearance(point-Vector3.RIGHT*epsilon),part.clearance(point+Vector3.UP*epsilon)-part.clearance(point-Vector3.UP*epsilon),part.clearance(point+Vector3.BACK*epsilon)-part.clearance(point-Vector3.BACK*epsilon)).normalized()
+				result = {"position":point,"normal":normal}
+				nearest = travel
+				break
+			travel += maxf(clearance*0.9,0.00001)
+	return result
+
+
 ## Projects a point outside nearby primitives. Multiple passes handle unions
 ## at shoulders/hips. Deeply impossible overlapping contacts remain bounded.
 func project_point(point: Vector3, rope_radius: float) -> Vector3:
 	var result := point
 	var contact_radius := rope_radius + SKIN
+	var floor_candidate := Vector3(result.x,maxf(result.y,floor_height+contact_radius),result.z) if floor_enabled else result
+	if _parts.is_empty() or (not _bounds.grow(contact_radius).has_point(result) and not _bounds.grow(contact_radius).has_point(floor_candidate)):
+		if floor_enabled: result.y = maxf(result.y,floor_height+contact_radius)
+		return result
 	for pass_index in 3:
 		var before := result
 		for part in _parts:
@@ -160,6 +190,8 @@ func solve(positions: PackedVector3Array, previous: PackedVector3Array, inverse_
 		var a := positions[i]
 		var b := positions[i + 1]
 		var segment_bounds := AABB(a.min(b), (b - a).abs()).grow(contact_radius)
+		if _parts.is_empty() or not segment_bounds.intersects(_bounds):
+			continue
 		for part in _parts:
 			if not segment_bounds.intersects(part.bounds):
 				continue

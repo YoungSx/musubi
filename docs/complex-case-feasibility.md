@@ -39,3 +39,41 @@ torso lacing. Screenshots and JSON are emitted to the requested output directory
 
 Failure reports must remain visible until these gates actually pass. Do not
 count restoring a prebuilt creation or freezing physics as completion.
+
+## 0.7 findings
+
+- `GroundFaces` splits projected edges at crossings and walks bounded faces.
+  Free-tail bridge edges are removed from face boundaries. `PassageChoice`
+  maintains several hypotheses and merges physically identical entrances before
+  applying the confidence margin; duplicate descriptions must not cause false
+  ambiguity. Unit tests cover mixed-arc cells, ties, jitter and genuine exits.
+- The two-pixel jitter replay initially failed the underpass and ended without
+  the intended knot. Filtering velocity in elapsed time, including retreat
+  detection, corrected this case: it retained `[-1,2,-3,1,-2,3]` after release.
+  This is input robustness evidence, not a novice-user study.
+- `SurfaceIntent` adds bounded surface targets using the same collider geometry
+  as the solver. A 6 m rope's endpoint reached torso height through screen-space
+  mouse input, without wheel/depth/camera controls. The attempt reached 6.74%
+  peak segment stretch. It did not retain a torso lattice after release. A rear
+  intent flag is not proof that a physical rear wrap completed.
+- Tightened-knot unthreading still FAILS. Both reversing the old pointer path
+  and directing the end through the visible region can buckle the tail and leave
+  the same knot or extra crossings. A tested endpoint-feed experiment did not
+  fix it and was removed from production code. Do not treat an individual
+  crossing or a remembered entrance as evidence of complete untying.
+
+Reproduce the negative acceptance with
+`godot --path . -s res://tools/verify_mouse_ground.gd -- <output> 1 --unwind`.
+This optional diagnostic is expected to return nonzero while the gate is open.
+It writes `mouse-knot.musubi`, so later work can use
+`--resume=<path-to-mouse-knot.musubi>` to reproduce from a real mouse-created knot.
+`tools/probe_long_mouse.gd -- <output>` separately records the long-rope mouse
+attempt. Neither probe counts the geometric stress fixture as player success.
+
+The next architectural work is a verified material-through-passage transport
+constraint with current crossing adjacency, bidirectional progress and contact
+order invariants; its acceptance must show complete unthreading without changing
+rope length, disabling collisions or moving particles outside the solver.
+For the torso target, continuous rear-surface routing and interlocking cell
+retention must pass before attempting a full hexagonal pattern. The current
+implementation does not establish that the requested complete pattern is playable.

@@ -8,7 +8,7 @@ in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
 The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: single-mouse ground play (0.6.0)
+## Current milestone: passage robustness and long-rope feasibility (0.7.0)
 
 The default scene retains the full mannequin and its limb/torso collisions.
 An unpinned rope rests naturally across its shoulders. Grab any visible portion
@@ -30,6 +30,13 @@ full mannequin. Left-drag forms loops; a sustained approach into a loop can
 gently lift a local strand and guide the tip underneath. Release removes the
 temporary support and lets the rope settle. No second mouse button or depth
 control is required in this session. See [single-mouse design and verification](docs/mouse-ground-play.md).
+
+Passage discovery now includes cells bounded by several material arcs, with
+persistent candidate evidence and time-based velocity filtering. A replay with
+two-pixel pointer jitter passes the complete ground knot sequence. Endpoint
+drags can transition from the ground to the mannequin surface. These improvements
+do **not** complete tightened-knot unwinding or a mouse-tied torso lattice;
+[complex-case results and failing gates](docs/complex-case-feasibility.md) remain explicit.
 
 The capabilities below describe the shared core and advanced workbench:
 
@@ -63,7 +70,7 @@ Space pauses/resumes, Esc cancels a grab and restores its starting shape, and
 F11 toggles full screen. Mouse picking uses a tighter tolerance than touch.
 In Workbench, gold marks the grabbed rope; blue marks its requested target, including when
 occluded. Continue/Hold controls physics explicitly; B or Other side turns the
-camera around. The Rope menu creates 1.4/2.2/3.0 m ropes and fixes/releases A or B.
+camera around. The Rope menu creates 1.4/2.2/3.0/6.0 m ropes and fixes/releases A or B.
 Ctrl+Z undoes a rope edit, Ctrl+Shift+Z/Ctrl+Y redoes it. History includes grabs,
 endpoint changes, new ropes and Reset; camera movement is not undone. It is
 bounded to 32 entries and 4 MiB of encoded snapshots. Loading clears history.
