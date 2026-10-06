@@ -52,6 +52,7 @@ func test_long_floor_rope_fits_before_interaction() -> void:
 	for point in app.rope.get_simulation().get_positions():
 		assert_true(frame.has_point(camera.unproject_position(point)),"long rope starts inside the fixed view")
 	assert_true(frame.has_point(camera.unproject_position(Vector3(0,1.75,0))),"full mannequin remains framed")
+	assert_true(camera.unproject_position(Vector3(0,1.75,0)).y > 110,"figure clears the title area")
 
 
 func _app() -> AppController:
