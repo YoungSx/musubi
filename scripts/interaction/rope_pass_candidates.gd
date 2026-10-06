@@ -97,10 +97,23 @@ func _build_loop(points: PackedVector3Array, radius: float, id: Vector3i, endpoi
 func _portal(loop: Dictionary, slot: int, points: PackedVector3Array, radius: float, collision: RopeCollision, endpoint: int) -> Dictionary:
 	if slot < 0 or slot > 8:
 		return {}
+	# The old single 75%-radius sample could sit inside a torso while a real
+	# passage existed nearer the same boundary. Search the radial strip, keeping
+	# each accepted corridor subject to full body and standing-rope clearance.
+	for sample in (1 if slot == 0 else 32):
+		var offset := 0 if sample == 0 else ceili(sample/2.0)*(1 if sample%2 else -1)
+		var fraction := config.side_portal_fraction+float(offset)/32.0
+		if fraction <= 0 or fraction >= 1: continue
+		var candidate := _portal_at(loop,slot,fraction,points,radius,collision,endpoint)
+		if not candidate.is_empty(): return candidate
+	return {}
+
+
+func _portal_at(loop: Dictionary, slot: int, fraction: float, points: PackedVector3Array, radius: float, collision: RopeCollision, endpoint: int) -> Dictionary:
 	var center: Vector3 = loop.origin
 	if slot > 0:
 		var boundary: PackedVector3Array = loop.boundary
-		var offset: Vector3 = (boundary[floori(float(slot - 1) * boundary.size() / 8.0)] - center) * config.side_portal_fraction
+		var offset: Vector3 = (boundary[floori(float(slot - 1) * boundary.size() / 8.0)] - center) * fraction
 		center += offset - loop.normal * offset.dot(loop.normal)
 	if not contains_clear_point(loop, center, radius) or not corridor_clear(points, radius, center, loop.normal, loop.half_length, collision, endpoint):
 		return {}
@@ -140,11 +153,22 @@ func corridor_clear(points: PackedVector3Array, radius: float, center: Vector3, 
 		half_length: float, collision: RopeCollision, endpoint: int) -> bool:
 	var a := center + normal * half_length
 	var b := center - normal * half_length
-	# Exact segment distance checks against rope; exclude only the short moving tip.
-	for k in points.size() - 1:
-		if (endpoint == 0 and k < 2) or (endpoint == points.size() - 1 and k >= points.size() - 3):
-			continue
-		var pair := RopeGeometry.closest_segment_points(a, b, points[k], points[k + 1])
+	# The immediate incoming tail occupies the corridor behind its tip during a
+	# pass. Exclude a bounded material length, independent of sampling density;
+	# split the boundary segment so a coarse sample cannot hide a distant return.
+	var remaining := half_length*2+radius*config.clearance_radii if endpoint == 0 or endpoint == points.size()-1 else 0.0
+	for step in points.size() - 1:
+		var k := points.size()-2-step if endpoint == points.size()-1 else step
+		var first := points[k+1] if endpoint == points.size()-1 else points[k]
+		var last := points[k] if endpoint == points.size()-1 else points[k+1]
+		if remaining > 0:
+			var length := first.distance_to(last)
+			if length <= remaining:
+				remaining -= length
+				continue
+			first = first.lerp(last,remaining/length)
+			remaining = 0
+		var pair := RopeGeometry.closest_segment_points(a, b, first, last)
 		if pair[0].distance_to(pair[1]) < radius * config.clearance_radii:
 			return false
 	if collision != null:

@@ -28,6 +28,36 @@ func test_body_blocked_center_can_offer_clear_side_corridors() -> void:
 		assert_true(candidate.id.z > 0, "blocked center is never chosen")
 		assert_true(collision.get_clearance(candidate.center) >= 0.012, "side corridor clears the real mannequin")
 
+func test_torso_ring_discovers_open_space_near_its_boundary() -> void:
+	var collision := RopeCollision.new()
+	collision.configure(load("res://data/mannequin/default_mannequin.tres"))
+	var points := PassFixture.points(Vector3.ZERO,0.2)
+	for i in points.size():
+		points[i] = Vector3(points[i].x,1.22+points[i].z,points[i].y)
+	points[0] = Vector3(0,1.30,0.17)
+	var provider := RopePassCandidates.new()
+	assert_true(provider.corridor_clear(points,0.012,Vector3(0,1.22,0.17),Vector3.UP,0.048,collision,0),"fixture has an actually clear corridor between torso and ring")
+	var candidates := provider.find(points,0.012,0,collision)
+	assert_true(not candidates.is_empty(),"a fixed radial sample must not erase the real body-side passage")
+	var sampled := RopeLayout.resample(points,96)
+	var sampled_candidates := provider.find(sampled,0.012,0,collision)
+	var front_found := false
+	for candidate in sampled_candidates:
+		if absf(candidate.center.x) < 0.04 and candidate.center.z > 0.15: front_found = true
+	assert_true(front_found,"a finely sampled incoming tail must not block its own entrance")
+	for candidate in candidates:
+		assert_true(provider.corridor_clear(points,0.012,candidate.center,candidate.normal,candidate.half_length,collision,0),"every reported passage clears the torso and all standing strands")
+	var assist := RopePassAssist.new()
+	var raw := points[0]
+	assist.begin(raw)
+	var active_seen := false
+	for i in 65:
+		raw.y -= 0.0016
+		points[0] = assist.update(raw,points[0],points,0.012,0,Vector3.BACK,collision,1.0/60)
+		active_seen = active_seen or assist.state != RopePassAssist.State.FREE
+	assert_true(active_seen,"sustained downwards intent chooses the nearby clear entrance among side candidates")
+	assert_true(points[0].y < 1.22,"the intended route crosses the ring plane beside the torso")
+
 
 func test_progress_is_input_driven_and_reversible() -> void:
 	var assist := RopePassAssist.new()
@@ -51,6 +81,19 @@ func test_progress_is_input_driven_and_reversible() -> void:
 		raw -= direction
 		points[0] = assist.update(raw, points[0], points, 0.012, 0.0, camera_back, null, 1.0 / 60.0)
 	assert_true(points[0].z > stopped.z, "reverse input moves back through the path")
+
+func test_incoming_tail_clearance_is_material_bounded() -> void:
+	var provider := RopePassCandidates.new()
+	var points := PackedVector3Array([Vector3(0,0.12,0),Vector3(0,0.10,0),Vector3(0,0.08,0),Vector3(0,0.06,0),Vector3(0,0.04,0),Vector3(0.2,0.02,0),Vector3(0.4,0.2,0)])
+	for sampled in [points,RopeLayout.resample(points,96)]:
+		assert_true(provider.corridor_clear(sampled,0.012,Vector3.ZERO,Vector3.UP,0.048,null,0),"the incoming tail can follow its tip through a corridor at either resolution")
+		var reversed: PackedVector3Array = sampled.duplicate()
+		reversed.reverse()
+		assert_true(provider.corridor_clear(reversed,0.012,Vector3.ZERO,Vector3.UP,0.048,null,reversed.size()-1),"both ends use the same material-length rule")
+	points.append_array(PackedVector3Array([Vector3(0.2,-0.1,0),Vector3(0,-0.04,0),Vector3(0,0.04,0)]))
+	assert_true(not provider.corridor_clear(points,0.012,Vector3.ZERO,Vector3.UP,0.048,null,0),"a nonlocal return still blocks the corridor")
+	var coarse := PackedVector3Array([Vector3(0,0.2,0),Vector3(0,-0.2,0)])
+	assert_true(not provider.corridor_clear(coarse,0.012,Vector3.ZERO,Vector3.UP,0.048,null,0),"a coarse first segment is trimmed rather than ignored in full")
 
 
 func test_collapsed_path_releases_without_a_jump() -> void:

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-maximum_candidates = 4
+maximum_candidates = 16
 score_threshold = 0.72
 score_margin = 0.12
 dwell_seconds = 0.1

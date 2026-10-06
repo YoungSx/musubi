@@ -68,6 +68,31 @@ rejected: this release retains the existing ten-substep Play preset. This also
 shows why passing the controlled corridor fixture is not a blanket stability or
 60 FPS guarantee for all mannequin manipulations.
 
+## Torso-side passage regression (2026-10-06)
+
+A 0.20 m radius ring around the torso has a narrow, genuinely clear corridor near
+its inner boundary. The previous single 75%-radius sample landed inside the body
+and missed it. Each of eight radial strips now tries bounded nearby fractions;
+each result still needs polygon, body and standing-rope clearance. Discovery
+retains up to 16 candidates instead of abandoning a five-entrance ring before
+intent scoring. Tied intent scores still do not acquire a path.
+
+The incoming strand also needs to follow its tip through an acquired corridor.
+Excluding only two segments made that allowance depend on discretization, and
+could invalidate guidance partway through. Clearance now excludes only a bounded
+length of the immediate tail (corridor length plus strand clearance). It trims
+the boundary segment and still rejects nonlocal returns. Unit tests cover both
+ends, coarse/fine sampling and a distant strand blocking the same passage. This
+does not disable solver self-collision or body collision.
+
+`tools/verify_pass_assist.gd -- <output> --torso` fixes a known ring around the
+full mannequin, then sends mouse input to its free end. The ring is fixed during
+fixture relaxation: letting it shrink beforehand closed the intended test gap.
+The actual endpoint crosses the aperture inside its boundary; peak segment error
+is 1.70%. Idle and release checks pass. The original side-aperture replay also
+passes. This is controlled passage verification, not a player-created ring/net,
+not structure retention, and not permission to guide through a closed gap.
+
 ## Remaining limits
 
 The detector approximates local openings and samples only a small number of side

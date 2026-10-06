@@ -3,7 +3,7 @@ extends Resource
 ## Conservative prototype assistance. No player-facing parameter controls.
 @export var closure_radii := 3.0
 @export var minimum_loop_segments := 6
-@export var maximum_candidates := 4
+@export var maximum_candidates := 16
 @export var side_portal_fraction := 0.75
 @export var search_distance := 0.3
 @export var approach_distance := 0.16
