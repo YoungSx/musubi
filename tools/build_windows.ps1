@@ -118,6 +118,11 @@ Musubi - Windows x64 prototype
 Double-click Musubi.exe. Keep Musubi.pck next to it.
 No Godot editor installation is required on the test computer.
 
+Menu > Lay rope on ground: fixed-camera floor play with the full mannequin.
+Use only left press, drag and release to shape, pass and pull. Local passage
+support is automatic; no second button, wheel or camera adjustment is required.
+
+Default shoulder scene / Advanced workbench controls:
 Left drag: shape rope or orbit empty space. Right/middle drag: pan.
 Wheel: zoom, or move the grabbed rope in depth. Grab an endpoint to free it.
 Release: natural motion in Play; hold shape in the legacy Workbench.
