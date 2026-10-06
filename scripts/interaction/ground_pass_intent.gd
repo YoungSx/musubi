@@ -101,6 +101,21 @@ func _update(raw: Vector3, actual: Vector3, points: PackedVector3Array, grip_u: 
 		var raw_side := (cursor - entry).dot(normal)
 		if supported.y < floor_height + radius * 3.5 and raw_side > -radius * 2:
 			cursor -= normal * (raw_side + radius * 2)
+
+		# Soft Lock (Nintendo-style progressive corridor alignment):
+		# Funnel the cursor laterally toward the corridor centerline,
+		# while advance/retreat along normal is 100% driven by player input.
+		var tangent := Vector2(-normal.y, normal.x)
+		var lateral := (cursor - entry).dot(tangent)
+		var breakout_width := radius * 7.0
+		if absf(lateral) > breakout_width:
+			_drop()
+			return raw
+		else:
+			var corridor_influence := clampf(1.0 - absf(lateral) / breakout_width, 0.0, 1.0)
+			var lock_weight := corridor_influence * clampf(support_strength, 0.0, 0.65)
+			cursor -= tangent * (lateral * lock_weight)
+
 		return Vector3(cursor.x, raw.y, cursor.y)
 	if not _recent_pass.is_empty():
 		var entry: Vector2 = _recent_pass.entry
@@ -122,6 +137,16 @@ func _update(raw: Vector3, actual: Vector3, points: PackedVector3Array, grip_u: 
 	phase = Phase.APPROACH if confidence > 0 else Phase.FREE
 	if not winner.is_empty():
 		_activate(winner,actual)
+	elif phase == Phase.APPROACH and confidence > 0.2 and not choice.tracks.is_empty():
+		var leading_candidate: Dictionary = choice.tracks[0].candidate
+		var approach_normal: Vector2 = leading_candidate.normal
+		var approach_tangent := Vector2(-approach_normal.y, approach_normal.x)
+		var to_entry: Vector2 = cursor - (leading_candidate.entry as Vector2)
+		var lateral_offset := to_entry.dot(approach_tangent)
+		if absf(lateral_offset) < radius * 6.0:
+			var lead_in_weight := clampf(confidence * 0.2, 0.0, 0.25)
+			cursor -= approach_tangent * (lateral_offset * lead_in_weight)
+			return Vector3(cursor.x, raw.y, cursor.y)
 	return raw
 
 

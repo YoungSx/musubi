@@ -32,6 +32,11 @@ covers local floor loops, not arbitrary knot topology or universal intent infere
 - `GroundPassIntent` scores approach direction, speed continuity, distance and
   candidate persistence. A candidate needs 120 ms of sustained evidence and a
   score margin. Switching loop identity resets confidence.
+- Nintendo-style progressive Soft Lock / corridor magnetism: when approaching or
+  traversing an entrance corridor, lateral cursor attraction gently aligns the tip
+  with the corridor centerline while 100% of forward/backward advance is player-driven.
+  Deliberate lateral pullout beyond the breakout width instantly releases assistance
+  without latching or snaps.
 - `GroundHand` supplies bounded vertical clearance. It never edits particles.
 - For a confirmed approach, the assist layer temporarily supports a local strand
   using the same soft XPBD constraint mathematics as the primary grip. Support

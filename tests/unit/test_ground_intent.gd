@@ -140,3 +140,35 @@ func test_shared_entrances_merge_and_inside_motion_can_exit() -> void:
 	intent._activate(exits[0],inside)
 	intent.observe_actual(Vector3(-0.05,0.012,0),points,0.012)
 	assert_eq(intent.confirmed_exits,1,"exit requires a real below-strand crossing")
+
+func test_soft_lock_aligns_corridor_laterally_and_breakout_releases() -> void:
+	var intent := _recognizer([])
+	intent._activate(_candidate(), Vector3(-0.04, 0.012, 0))
+	intent.support_strength = 0.8
+	# _candidate.entry is (0,0), normal is (1,0) (RIGHT). Tangent is (0,1) (UP/DOWN in 2D, mapped to z in 3D).
+	var raw_centered := Vector3(-0.02, 0.012, 0.0)
+	var out_centered := intent.update(raw_centered, Vector3(-0.02, 0.012, 0), _points(), 0, 0.012, 0, null, 1.0/60.0)
+	assert_near(out_centered.z, 0.0, "zero lateral offset stays centered", 0.001)
+
+	# Small lateral offset: soft lock gently pulls lateral misalignment towards centerline
+	var raw_offset := Vector3(-0.02, 0.012, 0.03)
+	var out_offset := intent.update(raw_offset, Vector3(-0.02, 0.012, 0), _points(), 0, 0.012, 0, null, 1.0/60.0)
+	assert_true(out_offset.z < 0.03 and out_offset.z > 0.0, "soft magnetism pulls lateral misalignment towards center")
+
+	# Large lateral offset (> radius * 7.0 = 0.084): deliberate sideways breakout
+	var raw_breakout := Vector3(-0.02, 0.012, 0.12)
+	var out_breakout := intent.update(raw_breakout, Vector3(-0.02, 0.012, 0), _points(), 0, 0.012, 0, null, 1.0/60.0)
+	assert_eq(intent.support_u, -1.0, "pulling away laterally cleanly breaks out and drops support")
+	assert_eq(out_breakout, raw_breakout, "breakout returns exact raw position without latching")
+
+func test_approach_lead_in_provides_subtle_magnetism() -> void:
+	var intent := _recognizer([_candidate()])
+	for frame in range(1, 8):
+		_advance(intent, frame)
+	assert_true(intent.phase == GroundPassIntent.Phase.APPROACH, "intent is in approach phase")
+	assert_true(intent.confidence > 0.2, "confidence is rising")
+	assert_true(intent.support_u < 0, "support is not yet active")
+	var raw_approach := Vector3(-0.05, 0.012, 0.02)
+	var out_approach := intent.update(raw_approach, Vector3(-0.04, 0.012, 0), _points(), 0, 0.012, 0, null, 1.0/60.0)
+	assert_true(out_approach.z < 0.02 and out_approach.z > 0.0, "approach lead-in provides subtle magnetism towards entrance")
+

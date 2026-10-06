@@ -43,7 +43,7 @@ func _run() -> void:
 	_button(MOUSE_BUTTON_LEFT, true)
 	await _frames(1)
 	_check(app.interaction_manager.get_selected_index() >= 0, "left button picks the visible end")
-	for destination in [Vector2(785, 500), Vector2(720, 555), Vector2(615, 570), Vector2(515, 580), Vector2(495, 565)]:
+	for destination in [Vector2(785, 500), Vector2(720, 555), Vector2(615, 570), Vector2(515, 580), Vector2(480, 560)]:
 		await _drag_to(destination, 70)
 	await _frames(30)
 	await _capture(args[0], "ground-loop-held")
@@ -54,7 +54,7 @@ func _run() -> void:
 	print("Observed loops=", GroundLoopTopology.new().observe(app.rope.get_simulation().get_positions(), app.rope.config.radius, 0).size())
 	_check(_crossings() >= 1, "left drag creates an actual over/under crossing")
 	var camera_before := app.camera_rig.capture_state()
-	pointer = Vector2(499, 565)
+	pointer = Vector2(480, 560)
 	_button(MOUSE_BUTTON_LEFT, true)
 	await _frames(1)
 	_check(app.interaction_manager.get_selected_index() >= 0, "re-grab the end without selecting a hole")
@@ -137,16 +137,13 @@ func _button(button: MouseButton, pressed: bool) -> void:
 	Input.parse_input_event(event)
 
 func _drag_to(destination: Vector2, frames: int) -> void:
-	var duration := float(frames) / 60.0 * motion_scale
-	var started := Time.get_ticks_usec()
+	var total_frames := maxi(1, roundi(frames * motion_scale))
 	var start := pointer
-	var frame := 0
-	while true:
-		var elapsed := float(Time.get_ticks_usec()-started)/1000000.0
-		var weight := minf(elapsed/duration,1.0)
-		var position := start.lerp(destination,weight)
+	for frame in range(1, total_frames + 1):
+		var weight := float(frame) / float(total_frames)
+		var position := start.lerp(destination, weight)
 		if jitter and weight < 1.0:
-			position += Vector2(sin(elapsed*54),cos(elapsed*42))*2.0
+			position += Vector2(sin(float(frame) * 0.9), cos(float(frame) * 0.7)) * 2.0
 		var event := InputEventMouseMotion.new()
 		event.device = ReplayInputGuard.DEVICE
 		event.position = position * Vector2(root.size) / Vector2(1280, 800)
@@ -157,13 +154,11 @@ func _drag_to(destination: Vector2, frames: int) -> void:
 		await process_frame
 		if checking_unwind:
 			var sim := app.rope.get_simulation()
-			unwind_peak_stretch = maxf(unwind_peak_stretch,sim.get_max_segment_stretch())
+			unwind_peak_stretch = maxf(unwind_peak_stretch, sim.get_max_segment_stretch())
 			var points := sim.get_positions()
-			for i in points.size(): unwind_max_motion = maxf(unwind_max_motion,points[i].distance_to(unwind_previous[i]))
+			for i in points.size(): unwind_max_motion = maxf(unwind_max_motion, points[i].distance_to(unwind_previous[i]))
 			unwind_previous = points.duplicate()
-			if frame%4 == 0: unwind_self_gap = minf(unwind_self_gap,SelfCollisionFixture.clearance(points,app.rope.config))
-		frame += 1
-		if weight >= 1.0: break
+			if frame % 4 == 0: unwind_self_gap = minf(unwind_self_gap, SelfCollisionFixture.clearance(points, app.rope.config))
 
 func _crossings() -> int:
 	return _crossing_order().size() / 2
