@@ -84,5 +84,7 @@ implementation does not establish that the requested complete pattern is playabl
 sequence, including jitter and the previously failing retreat route from a saved
 mouse-created knot. The implementation uses current geometry, not history undo.
 Length and self/body contacts remain active. This closes that specific failure;
-compound-knot unthreading, torso-lattice construction and novice observation are
-still open. The 0.7 observations above are retained as the failure baseline.
+player-created compound knots, torso-lattice construction and novice observation
+are still open. A separate controlled 6.216 m two-knot transport fixture now also
+passes after adding collision-aware passive-end payout. The 0.7 observations
+above are retained as the failure baseline.

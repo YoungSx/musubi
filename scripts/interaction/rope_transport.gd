@@ -14,8 +14,12 @@ var _velocity := Vector2.ZERO
 var _abandoned := false
 var _screen_axis := Vector2.ZERO
 var _meters_per_pixel := 0.0
+var _ground_height := 0.0
+var _payout := RopePayout.new()
+var _radius := 0.012
+var _collision: RopeCollision
 
-func begin(points: PackedVector3Array,u: float,radius: float,floor_y: float) -> void:
+func begin(points: PackedVector3Array,u: float,radius: float,floor_y: float,collision: RopeCollision = null) -> void:
 	active = false
 	eligible = false
 	progress = 0
@@ -24,13 +28,19 @@ func begin(points: PackedVector3Array,u: float,radius: float,floor_y: float) -> 
 	_velocity = Vector2.ZERO
 	_abandoned = false
 	_curve = points.duplicate()
+	_ground_height = floor_y+radius+0.00005
+	_radius = radius
+	_collision = collision
 	_arc.resize(points.size())
 	_arc[0] = 0
 	for i in range(1,points.size()): _arc[i] = _arc[i-1]+points[i-1].distance_to(points[i])
 	_end = points.size()-1 if u >= 0.975 else 0
+	_payout.configure(_curve,points.size()-1-_end,radius,_ground_height,collision)
 	if u > 0.025 and u < 0.975: return
 	for point in points:
 		if point.y > floor_y+0.3: return
+	if Vector2(points[1].x-points[0].x,points[1].z-points[0].z).length_squared() < 1e-10: return
+	if Vector2(points[-1].x-points[-2].x,points[-1].z-points[-2].z).length_squared() < 1e-10: return
 	eligible = crossing_word(points,radius).size() >= 6
 
 func update(delta: Vector2,camera: Camera3D,points: PackedVector3Array,radius: float,dt: float) -> PackedVector3Array:
@@ -56,6 +66,7 @@ func update(delta: Vector2,camera: Camera3D,points: PackedVector3Array,radius: f
 		if _dwell < 0.12 or _travel < radius: return PackedVector3Array()
 		# Refresh the guide at commitment; free approach may have moved the rope.
 		_curve = points.duplicate()
+		_payout.configure(_curve,points.size()-1-_end,_radius,_ground_height,_collision)
 		for i in range(1,points.size()): _arc[i] = _arc[i-1]+points[i-1].distance_to(points[i])
 		active = true
 		_screen_axis = direction
@@ -84,8 +95,10 @@ func stop() -> void:
 	_abandoned = true
 
 func _sample(distance: float) -> Vector3:
-	if distance <= 0: return _curve[0]+(_curve[1]-_curve[0]).normalized()*distance
-	if distance >= _arc[-1]: return _curve[-1]+(_curve[-1]-_curve[-2]).normalized()*(distance-_arc[-1])
+	if distance <= 0:
+		return _payout.sample(-distance) if _end != 0 else _curve[0]
+	if distance >= _arc[-1]:
+		return _payout.sample(distance-_arc[-1]) if _end == 0 else _curve[-1]
 	var left := 0
 	var right := _arc.size()-1
 	while right-left > 1:

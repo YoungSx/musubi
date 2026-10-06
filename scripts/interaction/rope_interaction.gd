@@ -100,7 +100,7 @@ func begin(screen_position: Vector2) -> bool:
 		_ground_intent.clear()
 		_ground_simulation_id = simulation_id
 	_ground_intent.begin(point)
-	_transport.begin(_rope.get_simulation().get_positions(),_picked_u,_rope.config.radius,floor_height)
+	_transport.begin(_rope.get_simulation().get_positions(),_picked_u,_rope.config.radius,floor_height,_rope.get_collision())
 	if _rope.is_start_attached() or _rope.is_end_attached(): _transport.eligible = false
 	_surface_intent.begin(point,screen_position)
 	_pass_assist.begin(point)

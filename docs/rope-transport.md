@@ -19,8 +19,9 @@ inside the knot. Sideways input exits the assistance; releasing or cancelling th
 grab removes it. Holding the pointer still does not advance material distance.
 
 The interaction proposes distributed soft position constraints at `p(s_i + shift)`.
-The opposite end extends along the current tail direction, so no material is
-deleted. `RopeSimulation` solves these targets before its regular length and
+The opposite end supplies material along an incrementally planned floor path;
+it can turn away from existing strands and the mannequin, so no material is
+deleted or requested below the floor. `RopeSimulation` solves these targets before its regular length and
 contact constraints. Particles remain movable; there are no new persistent pins.
 Progress stops when the physical rope lags too far behind the proposed guide.
 This is deliberate game assistance, not a claim of unassisted physical realism.
@@ -41,9 +42,14 @@ Cancellation restores the pre-grab scene, including removal of transport targets
   about 0.02387 m. This does not require a recorded creation history.
 - The opposite endpoint also unthreads the saved knot: zero final crossings,
   about 0.92% peak length error and 0.02393 m sampled clearance.
-- 130 unit tests pass. Coverage includes delayed activation, stationary input, reverse progress,
+- 132 unit tests pass. Coverage includes delayed activation, stationary input, reverse progress,
   lateral exit, snapshot continuation, malformed data, cancellation and real
   focus-loss cleanup.
+- A controlled 6.216 m, 192-segment two-knot fixture reduces six crossings to
+  zero and stays clear after release: peak length error about 0.55%, sampled
+  clearance about 0.02388 m. Straight passive-end extrusion initially stalled
+  against the second knot; collision-aware payout corrected that failure.
+  This fixture is prearranged and is NOT evidence that a player created two knots.
 
 Replays use elapsed seconds for gestures, so monitor refresh rate no longer
 silently changes their speed. Synthetic windows ignore unrelated host focus
@@ -54,9 +60,10 @@ is separately tested with the production policy enabled.
 godot --path . -s res://tools/verify_mouse_ground.gd -- <output> 1 --unwind
 godot --path . -s res://tools/verify_mouse_ground.gd -- <output> 0.85 --jitter --unwind
 godot --path . -s res://tools/verify_mouse_ground.gd -- <output> 1 --legacy-unwind --resume=<mouse-knot.musubi>
+godot --path . -s res://tools/verify_transport_compound.gd -- <output>
 ```
 
 Clearance is sampled; bounded sweep tests and this replay are not a proof against
-every possible tunneling case. Compound knots, model-wrapped ropes and first-time
+every possible tunneling case. Player-created compound knots, model-wrapped ropes and first-time
 player usability remain separate acceptance gates. The full torso lattice has
 not been achieved by this ground-only feature.

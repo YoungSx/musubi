@@ -84,6 +84,29 @@ func test_both_endpoints_transport_without_deleting_material() -> void:
 		assert_true(targets[end].distance_to(points[end]) > 0.001,"selected end retracts along the current path")
 		assert_true(targets[points.size()-1-end].distance_to(points[points.size()-1-end]) > 0.001,"opposite end supplies the displaced material")
 
+func test_material_extension_cannot_request_motion_below_floor() -> void:
+	var points := _points()
+	points[0].y = 0.01205
+	points[1].y = 0.022
+	var transport := RopeTransport.new()
+	transport.begin(points,1,0.012,0)
+	transport.active = true
+	transport.progress = 0.5
+	var targets := transport.targets()
+	assert_true(targets[0].y >= 0.012,"material emerging from an inclined tail stays above floor")
+	var supplied := PackedVector3Array()
+	for i in 21: supplied.append(transport._payout.sample(0.5*float(i)/20))
+	assert_near(RopeLayout.polyline_length(supplied),0.5,"floor handling preserves supplied arc length",0.02)
+
+func test_payout_routes_around_other_strands() -> void:
+	var points := PackedVector3Array([Vector3(0,0.01205,0),Vector3(-0.03,0.01205,0),Vector3(-0.06,0.01205,0),Vector3(-0.1,0.01205,0),Vector3(0.3,0.01205,-0.2),Vector3(0.3,0.01205,0.2),Vector3(0.5,0.01205,0.3)])
+	var payout := RopePayout.new()
+	payout.configure(points,0,0.012,0.01205,null)
+	var end := payout.sample(0.6)
+	assert_true(absf(end.z) > 0.1,"blocked straight payout turns toward free space")
+	for point in payout._path:
+		assert_true(RopePayout._segment_distance(point,points[4],points[5]) >= 0.012*1.9,"payout respects the blocking strand")
+
 func test_escape_cancels_transport_without_losing_original_scene() -> void:
 	var app := add_to_tree(load("res://scenes/main/play.tscn").instantiate()) as AppController
 	app.process_mode = Node.PROCESS_MODE_DISABLED

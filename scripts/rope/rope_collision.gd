@@ -110,6 +110,10 @@ func configure(config: MannequinConfig, world_transform := Transform3D.IDENTITY,
 ## Signed distance to the nearest obstacle surface, before rope radius.
 func get_clearance(point: Vector3) -> float:
 	var result := point.y - floor_height if floor_enabled else INF
+	return minf(result,get_body_clearance(point))
+
+func get_body_clearance(point: Vector3) -> float:
+	var result := INF
 	for part in _parts:
 		result = minf(result, part.clearance(point))
 	return result
