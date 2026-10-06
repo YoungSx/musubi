@@ -31,6 +31,7 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_ground_intent.gd",
 	"res://tests/unit/test_surface_intent.gd",
 	"res://tests/unit/test_rope_transport.gd",
+	"res://tests/unit/test_torso_loop_evidence.gd",
 ]
 
 

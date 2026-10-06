@@ -12,6 +12,8 @@ var _output := ""
 var _duration_scale := 1.0
 var pass_frames := 0
 var phase := "lift"
+var single_loop := false
+var loop_seen := false
 var samples: Array[String] = ["phase,time_us,pointer_x,pointer_y,target_x,target_y,actual_x,actual_y,actual_z,active,rear,rim,exit_seen,via_pending,pass_state,hand_gap,goal_gap,route_x,route_y,route_z,requested_x,requested_y,requested_z"]
 
 func _initialize() -> void:
@@ -19,7 +21,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	_output = OS.get_cmdline_user_args()[0]
-	if OS.get_cmdline_user_args().size() > 1: _duration_scale = float(OS.get_cmdline_user_args()[1])
+	if OS.get_cmdline_user_args().size() > 1 and OS.get_cmdline_user_args()[1].is_valid_float(): _duration_scale = float(OS.get_cmdline_user_args()[1])
+	single_loop = "--single-loop" in OS.get_cmdline_user_args()
 	app = load("res://scenes/main/play.tscn").instantiate()
 	root.add_child(app)
 	ReplayInputGuard.install(self)
@@ -40,10 +43,13 @@ func _run() -> void:
 	await _capture("lattice-lifted")
 	# Alternate sweeps across the silhouette, then diagonals at successive heights.
 	var step := 0
-	for goal in [Vector2(595,300),Vector2(560,300),Vector2(595,300),Vector2(690,300),Vector2(730,300),Vector2(690,315),Vector2(600,345),Vector2(555,345),Vector2(600,345),Vector2(690,345),Vector2(730,345),Vector2(690,360),Vector2(600,395),Vector2(555,395),Vector2(600,395),Vector2(690,395),Vector2(730,395),Vector2(665,375),Vector2(600,330),Vector2(670,290)]:
+	var goals := [Vector2(595,300),Vector2(560,300),Vector2(595,300),Vector2(690,300),Vector2(730,300),Vector2(690,315),Vector2(600,345),Vector2(555,345),Vector2(600,345),Vector2(690,345),Vector2(730,345),Vector2(690,360),Vector2(600,395),Vector2(555,395),Vector2(600,395),Vector2(690,395),Vector2(730,395),Vector2(665,375),Vector2(600,330),Vector2(670,290)]
+	if single_loop: goals = [Vector2(595,300),Vector2(560,300),Vector2(595,300),Vector2(690,300),Vector2(730,300),Vector2(690,300),Vector2(640,300),Vector2(640,340)]
+	for goal in goals:
 		phase = "stroke_%d" % (step+1)
 		await _drag(goal,1.5)
 		step += 1
+		loop_seen = loop_seen or not TorsoLoopEvidence.observe(app.rope.get_simulation().get_positions(),app.rope.config.radius).is_empty()
 		print("Lacing step=",step," actual=",app.rope.get_simulation().get_grip_position()," rear intent=",app.interaction_manager._rope_interaction._surface_intent.rear," peak stretch=",peak_stretch)
 		if step%5 == 0: await _capture("lattice-step-%d" % step)
 	_button(false)
@@ -51,10 +57,13 @@ func _run() -> void:
 	await _capture("lattice-released")
 	var retained := 0.0
 	var points := app.rope.get_simulation().get_positions()
+	var retained_loop := TorsoLoopEvidence.observe(points,app.rope.config.radius)
 	for i in points.size()-1:
 		if minf(points[i].y,points[i+1].y) > 0.8: retained += points[i].distance_to(points[i+1])
 	var report := {"scope":"mouse-driven full-mannequin lacing attempt; visual topology review required",
 		"gesture_duration_scale":_duration_scale,"spatial_pass_active_frames":pass_frames,
+		"single_loop_gate":single_loop,"torso_loop_seen_at_stroke_boundary":loop_seen,"retained_torso_loop":retained_loop,
+		"subsequent_pass_unwind_regrab":"not evaluated by this formation gate",
 		"peak_segment_error":peak_stretch,"grip_body_clearance":least_clearance,
 		"actual_rear_travel":rear_distance,"rope_above_waist_after_release":retained,
 		"camera_unchanged":app.camera_rig.capture_state()==view,
@@ -72,7 +81,9 @@ func _run() -> void:
 	app.camera_rig.turn_around()
 	app.camera_rig._process(10)
 	await _capture("lattice-inspection-back")
-	quit()
+	if single_loop:
+		print("PASS" if loop_seen and not retained_loop.is_empty() else "FAIL", " player-created torso loop survives release; later sequence remains unevaluated")
+	quit(2 if single_loop and (not loop_seen or retained_loop.is_empty()) else 0)
 
 func _button(pressed: bool) -> void:
 	var event := InputEventMouseButton.new()

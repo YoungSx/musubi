@@ -71,6 +71,11 @@ shows why passing the controlled corridor fixture is not a blanket stability or
 
 ## Torso-side passage regression (2026-10-06)
 
+The later [sequence acceptance and fixture audit](acceptance-torso-sequence.md)
+supersedes the circular fixture's whole-body collision evidence below. Its revised
+elliptical fixture checks all segments against the mannequin and passes reverse,
+regrab, withdrawal and bypass cases. Free-rope loop formation remains unaccepted.
+
 A 0.20 m radius ring around the torso has a narrow, genuinely clear corridor near
 its inner boundary. The previous single 75%-radius sample landed inside the body
 and missed it. Each of eight radial strips now tries bounded nearby fractions;
