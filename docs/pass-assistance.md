@@ -60,6 +60,14 @@ In a same-host headless query probe, medians were 0.18 ms for the initial
 torso-occluded aperture. These are bounded local-query examples, not worst-case
 mobile or dense-knot performance guarantees.
 
+A fixed-step mannequin drag comparison measured about 18 ms CPU/frame with
+assistance off and 17–18 ms with it on (run-to-run variation). Lowering the Play
+preset from ten to six substeps reduced this to about 11 ms, but increased maximum
+segment stretch in that stress path from 8.5% to 13.7%. The optimization was
+rejected: this release retains the existing ten-substep Play preset. This also
+shows why passing the controlled corridor fixture is not a blanket stability or
+60 FPS guarantee for all mannequin manipulations.
+
 ## Remaining limits
 
 The detector approximates local openings and samples only a small number of side
