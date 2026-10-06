@@ -16,6 +16,36 @@ var _min_depth := 0.1
 var _max_depth := 10.0
 var _picked_u := 0.0
 var _camera_reference := Transform3D.IDENTITY
+var _pass_assist := RopePassAssist.new()
+var _assist_enabled := false
+var _last_intent_usec := 0
+var _manual_depth_until_usec := 0
+var _validation_time := 0.0
+
+
+func set_pass_assist_enabled(enabled: bool) -> void:
+	_assist_enabled = enabled
+	_pass_assist.begin(Vector3.ZERO)
+
+
+func configure_pass_assistance(config: PassAssistConfig) -> void:
+	if config != null:
+		_pass_assist.config = config.duplicate() as PassAssistConfig
+
+
+func get_pass_state() -> RopePassAssist.State:
+	return _pass_assist.state
+
+
+func tick(delta: float) -> void:
+	if not _assist_enabled or _selected_index < 0 or _pass_assist.state == RopePassAssist.State.FREE:
+		return
+	_validation_time -= delta
+	if _validation_time > 0.0:
+		return
+	_validation_time = 0.05
+	if not _pass_assist.validate_active(_rope.get_simulation().get_positions(), _rope.config.radius, _picked_u, _rope.get_collision()):
+		rebase(_last_screen_position) # Keep the hand target fixed; only discard the path.
 
 
 func configure(rope: Rope, camera: Camera3D) -> void:
@@ -46,6 +76,9 @@ func begin(screen_position: Vector2) -> bool:
 	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
 	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
 	_camera_reference = _camera.global_transform
+	_pass_assist.begin(point)
+	_last_intent_usec = Time.get_ticks_usec()
+	_manual_depth_until_usec = 0
 	return true
 
 
@@ -57,7 +90,18 @@ func move(screen_position: Vector2) -> void:
 	_last_screen_position = screen_position
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection != null:
-		_rope.update_drag_target((intersection as Vector3) + _grab_offset)
+		var target := (intersection as Vector3) + _grab_offset
+		var now := Time.get_ticks_usec()
+		if _assist_enabled and now >= _manual_depth_until_usec:
+			var sim := _rope.get_simulation()
+			target = _pass_assist.update(target, sim.get_grip_position(), sim.get_positions(), _rope.config.radius,
+				_picked_u, _camera.global_basis.z.normalized(), _rope.get_collision(), minf(float(now - _last_intent_usec) / 1000000.0, 0.1))
+		else:
+			_pass_assist.begin(target)
+		_last_intent_usec = now
+		_rope.update_drag_target(target)
+		if _pass_assist.needs_rebase:
+			rebase(screen_position)
 
 
 ## A camera move must not be interpreted as a hand move. Keep the requested
@@ -77,6 +121,7 @@ func rebase(screen_position: Vector2) -> void:
 	_min_depth = maxf(_camera.near + 0.05, _drag_depth - _rope.config.length * 2.0)
 	_max_depth = minf(_camera.far * 0.9, _drag_depth + _rope.config.length * 2.0)
 	_camera_reference = _camera.global_transform
+	_pass_assist.begin(target)
 
 
 ## Wheel-up moves the active plane toward the viewer. Reachability and soft
@@ -86,6 +131,7 @@ func adjust_depth(factor: float) -> void:
 		return
 	if not _camera_reference.is_equal_approx(_camera.global_transform):
 		rebase(_last_screen_position)
+	_manual_depth_until_usec = Time.get_ticks_usec() + 300000
 	_drag_depth = clampf(_drag_depth / factor, _min_depth, _max_depth)
 	_drag_plane = Plane(_drag_plane.normal, _drag_origin - _drag_plane.normal * _drag_depth)
 	move(_last_screen_position)
@@ -99,6 +145,7 @@ func end() -> void:
 	if _selected_index >= 0 and is_instance_valid(_rope):
 		_rope.end_drag()
 	_selected_index = -1
+	_pass_assist.begin(Vector3.ZERO)
 
 
 func get_selected_index() -> int:
@@ -108,6 +155,7 @@ func get_selected_index() -> int:
 func cancel() -> void:
 	_rope.cancel_drag()
 	_selected_index = -1
+	_pass_assist.begin(Vector3.ZERO)
 
 
 func pick(screen_position: Vector2) -> int:

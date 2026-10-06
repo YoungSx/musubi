@@ -50,7 +50,8 @@ godot --path . -s res://tools/verify_play_mannequin.gd -- <existing-output-direc
 
 This verifies the direct-grip/release foundation on complex geometry. It does
 not establish that a player can form Loop, Overhand or Half Hitch naturally.
-The depth plane and optional desktop wheel remain a fallback. Pass-corridor
-candidates, intent scoring, surface-following assistance and automatic camera
-attention still require their own implementation and gameplay acceptance.
+The depth plane and optional desktop wheel remain a fallback. Local pass-corridor
+candidates and intent scoring were added in 0.5.0; see `pass-assistance.md` for
+their deliberately limited acceptance. Surface-following assistance and automatic
+camera attention still require implementation and gameplay acceptance.
 Synthetic replay is not a first-time-player usability study.

@@ -8,7 +8,7 @@ in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
 The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: direct rope play on the mannequin (0.4.0)
+## Current milestone: local pass assistance on the mannequin (0.5.0)
 
 The default scene retains the full mannequin and its limb/torso collisions.
 An unpinned rope rests naturally across its shoulders. Grab any visible portion
@@ -20,8 +20,10 @@ scene without dropping the rope or moving the world-space hand target.
 The default UI has one Menu entry. Rope settings, snapshots, undo/redo and pause
 controls remain available through Advanced; developer targets and endpoint labels
 are hidden in normal play. Saved workbench creations retain their old held-release
-behavior. This is the first interaction correction; automatic pass corridors,
-intent scoring and verified Overhand/Half Hitch play are not implemented yet.
+behavior. Play mode now offers conservative local pass-corridor assistance,
+including intent scoring and clear side passages around mannequin occlusion.
+Verified first-time-player Overhand/Half Hitch play is not implemented yet.
+See [pass assistance and its acceptance limits](docs/pass-assistance.md).
 
 The capabilities below describe the shared core and advanced workbench:
 
@@ -105,6 +107,8 @@ godot --path . -s res://tools/verify_interaction.gd -- <output-directory>
 godot --path . -s res://tools/verify_self_collision.gd -- <output-directory>
 godot --path . -s res://tools/verify_tightening.gd -- <output-directory>
 godot --path . -s res://tools/verify_wrap.gd -- <output-directory>
+godot --path . -s res://tools/verify_pass_assist.gd -- <output-directory>
+godot --path . -s res://tools/verify_play_mannequin.gd -- <output-directory>
 godot --path . -s res://tools/verify_creation_workflow.gd -- <output-directory>
 godot --headless --path . -s res://tools/benchmark_creation.gd
 godot --path . -s res://tools/verify_desktop_stability.gd
@@ -115,7 +119,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 95 tests passed. A rendered scene smoke check exercised camera orbit,
+All 103 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.

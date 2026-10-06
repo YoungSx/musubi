@@ -16,6 +16,7 @@ func _run() -> void:
 		return
 	app = load("res://scenes/main/play.tscn").instantiate()
 	root.add_child(app)
+	ReplayInputGuard.install(self)
 	await _frames(180)
 	_check(app.mannequin.config.parts.size() >= 10, "full articulated mannequin is the play obstacle")
 	_button(true)
@@ -41,6 +42,7 @@ func _run() -> void:
 	await _capture(args[0], "play-human-grabbed")
 	var target_before := sim.get_drag_target()
 	var inspect := InputEventMouseButton.new()
+	inspect.device = ReplayInputGuard.DEVICE
 	inspect.button_index = MOUSE_BUTTON_RIGHT
 	inspect.position = pointer * Vector2(root.size) / Vector2(1280, 800)
 	inspect.pressed = true
@@ -63,6 +65,7 @@ func _run() -> void:
 	await _frames(90)
 	_check(sim.get_positions() != before, "rope continues settling on the mannequin")
 	await _capture(args[0], "play-human-released")
+	print("Unfocused replay timings (not foreground FPS acceptance): ", app.get_node("PerformanceCapture").recorder.summary())
 	var path := args[0].path_join("play-human.musubi")
 	_check(app.save_creation(path) == OK, "natural play state saves")
 	app.reset()
@@ -75,6 +78,7 @@ func _run() -> void:
 func _motion(position: Vector2) -> void:
 	var scale := Vector2(root.size) / Vector2(1280, 800)
 	var event := InputEventMouseMotion.new()
+	event.device = ReplayInputGuard.DEVICE
 	event.position = position * scale
 	event.relative = (position - pointer) * scale
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT
@@ -84,6 +88,7 @@ func _motion(position: Vector2) -> void:
 
 func _button(pressed: bool) -> void:
 	var event := InputEventMouseButton.new()
+	event.device = ReplayInputGuard.DEVICE
 	event.position = pointer * Vector2(root.size) / Vector2(1280, 800)
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = pressed

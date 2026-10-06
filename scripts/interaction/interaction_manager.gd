@@ -9,6 +9,7 @@ extends Node
 
 @export var camera_rig: CameraRig
 @export var rope: Rope
+@export var pass_assist_config: PassAssistConfig
 signal hover_changed(index: int)
 
 var _gestures := GestureTracker.new()
@@ -22,6 +23,7 @@ func _ready() -> void:
 	assert(camera_rig != null, "InteractionManager requires a CameraRig.")
 	assert(rope != null, "InteractionManager requires a Rope.")
 	_rope_interaction.configure(rope, camera_rig.get_camera())
+	_rope_interaction.configure_pass_assistance(pass_assist_config)
 	_gestures.primary_started.connect(_on_primary_started)
 	_gestures.primary_drag.connect(_on_primary_drag)
 	_gestures.primary_ended.connect(_on_primary_ended)
@@ -34,6 +36,7 @@ func _ready() -> void:
 
 func set_play_mode(enabled: bool) -> void:
 	_gestures.preserve_grip_during_inspection = enabled
+	_rope_interaction.set_pass_assist_enabled(enabled)
 
 
 func _on_inspection_ended(position: Vector2) -> void:
@@ -71,6 +74,7 @@ func handle_input(event: InputEvent) -> bool:
 
 
 func _process(delta: float) -> void:
+	_rope_interaction.tick(delta)
 	if not OS.has_feature("pc"):
 		return
 	_hover_time -= delta

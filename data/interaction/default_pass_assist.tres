@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="PassAssistConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/pass_assist_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+maximum_candidates = 4
+score_threshold = 0.72
+score_margin = 0.12
+dwell_seconds = 0.1
+lateral_gain = 0.4

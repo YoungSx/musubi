@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/core/desktop_window.gd" id="9_window"]
 [ext_resource type="Script" path="res://scripts/interaction/desktop_shortcuts.gd" id="10_shortcuts"]
 [ext_resource type="Script" path="res://scripts/debug/performance_capture.gd" id="11_performance"]
+[ext_resource type="Resource" path="res://data/interaction/default_pass_assist.tres" id="12_pass"]
 
 [node name="Main" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "interaction_manager", "hud", "rope_debug")]
 script = ExtResource("1_app")
@@ -33,6 +34,7 @@ rope_debug = NodePath("RopeDebug")
 script = ExtResource("5_interaction")
 camera_rig = NodePath("../CameraRig")
 rope = NodePath("../Rope")
+pass_assist_config = ExtResource("12_pass")
 
 [node name="Hud" parent="." instance=ExtResource("6_hud")]
 
