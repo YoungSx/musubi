@@ -18,6 +18,8 @@ var _hover_index := -1
 var _hover_time := 0.0
 var _inspecting := false
 var play_enabled := false
+## Test-window policy seam. Real application windows always keep this enabled.
+var cancel_on_focus_loss := true
 
 
 func _ready() -> void:
@@ -62,7 +64,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+	if cancel_on_focus_loss and (what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT):
 		reset()
 
 

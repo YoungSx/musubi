@@ -6,6 +6,11 @@ var failures := 0
 var left_down := false
 var motion_scale := 1.0
 var jitter := false
+var checking_unwind := false
+var unwind_peak_stretch := 0.0
+var unwind_self_gap := INF
+var unwind_max_motion := 0.0
+var unwind_previous := PackedVector3Array()
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -92,20 +97,32 @@ func _run() -> void:
 
 
 func _unwind(output: String) -> void:
+	checking_unwind = true
+	unwind_previous = app.rope.get_simulation().get_positions().duplicate()
 	pointer = Vector2(750,525)
+	if "--left-unwind" in OS.get_cmdline_user_args(): pointer = Vector2(515,574)
 	_button(MOUSE_BUTTON_LEFT,true)
 	await _frames(1)
 	_check(app.interaction_manager.get_selected_index() >= 0,"pick tightened end for natural unwind")
 	print("Grip u=",app.interaction_manager._rope_interaction._picked_u," ground=",app.interaction_manager._rope_interaction._ground_hand.active)
-	for destination in [Vector2(680,580),Vector2(680,610),Vector2(680,660),Vector2(610,680),Vector2(500,650),Vector2(460,540)]:
+	var destinations := [Vector2(680,580),Vector2(550,650),Vector2(400,720),Vector2(200,740)]
+	if "--legacy-unwind" in OS.get_cmdline_user_args():
+		destinations = [Vector2(680,580),Vector2(680,610),Vector2(680,660),Vector2(610,680),Vector2(500,650),Vector2(460,540)]
+	if "--left-unwind" in OS.get_cmdline_user_args():
+		destinations = [Vector2(585,595),Vector2(735,630),Vector2(920,680),Vector2(1120,740)]
+	for destination in destinations:
 		await _drag_to(destination,90)
-		print("Unwind pointer=",pointer," crossings=",_crossings()," phase=",app.interaction_manager._rope_interaction._ground_intent.phase," completed=",app.interaction_manager._rope_interaction._ground_intent.confirmed_exits," tip=",app.camera_rig.get_camera().unproject_position(app.rope.get_simulation().get_grip_position()))
+		print("Unwind pointer=",pointer," crossings=",_crossings()," phase=",app.interaction_manager._rope_interaction._ground_intent.phase," transport=",app.interaction_manager._rope_interaction._transport.active," progress=",app.interaction_manager._rope_interaction._transport.progress," tip=",app.camera_rig.get_camera().unproject_position(app.rope.get_simulation().get_grip_position()))
 		await _capture(output,"unwind-%d-%d" % [pointer.x,pointer.y])
 	_button(MOUSE_BUTTON_LEFT,false)
 	await _frames(120)
 	await _capture(output,"ground-unwound")
 	print("Remaining crossing order: ",_crossing_order())
 	_check(_crossings() == 0,"reverse mouse motion removes crossings without reset or undo")
+	print("Unwind safety: stretch=",unwind_peak_stretch," sampled self gap=",unwind_self_gap," max frame movement=",unwind_max_motion)
+	_check(unwind_peak_stretch < 0.05,"unwind preserves segment length within five percent")
+	_check(unwind_self_gap >= app.rope.config.radius*1.8,"unwind maintains sampled strand clearance")
+	_check(not app.rope.get_simulation().has_transport_targets(),"release clears transport constraints")
 
 func _frames(count: int) -> void:
 	for i in count: await process_frame
@@ -120,12 +137,16 @@ func _button(button: MouseButton, pressed: bool) -> void:
 	Input.parse_input_event(event)
 
 func _drag_to(destination: Vector2, frames: int) -> void:
-	frames = maxi(1, roundi(frames * motion_scale))
+	var duration := float(frames) / 60.0 * motion_scale
+	var started := Time.get_ticks_usec()
 	var start := pointer
-	for frame in frames:
-		var position := start.lerp(destination, float(frame + 1) / frames)
-		if jitter and frame+1 < frames:
-			position += Vector2(sin(frame*0.9),cos(frame*0.7))*2.0
+	var frame := 0
+	while true:
+		var elapsed := float(Time.get_ticks_usec()-started)/1000000.0
+		var weight := minf(elapsed/duration,1.0)
+		var position := start.lerp(destination,weight)
+		if jitter and weight < 1.0:
+			position += Vector2(sin(elapsed*54),cos(elapsed*42))*2.0
 		var event := InputEventMouseMotion.new()
 		event.device = ReplayInputGuard.DEVICE
 		event.position = position * Vector2(root.size) / Vector2(1280, 800)
@@ -134,6 +155,15 @@ func _drag_to(destination: Vector2, frames: int) -> void:
 		Input.parse_input_event(event)
 		pointer = position
 		await process_frame
+		if checking_unwind:
+			var sim := app.rope.get_simulation()
+			unwind_peak_stretch = maxf(unwind_peak_stretch,sim.get_max_segment_stretch())
+			var points := sim.get_positions()
+			for i in points.size(): unwind_max_motion = maxf(unwind_max_motion,points[i].distance_to(unwind_previous[i]))
+			unwind_previous = points.duplicate()
+			if frame%4 == 0: unwind_self_gap = minf(unwind_self_gap,SelfCollisionFixture.clearance(points,app.rope.config))
+		frame += 1
+		if weight >= 1.0: break
 
 func _crossings() -> int:
 	return _crossing_order().size() / 2

@@ -27,6 +27,8 @@ var _support_index := -1
 var _support_fraction := 0.0
 var _support_target := Vector3.ZERO
 var _support_lambda := Vector3.ZERO
+var _transport_targets := PackedVector3Array()
+var _transport_lambdas := PackedVector3Array()
 
 
 func _init(config: RopeConfig, initial_positions: PackedVector3Array) -> void:
@@ -56,6 +58,7 @@ func step(dt: float) -> void:
 		_lambdas.fill(0.0)
 		_drag_lambda = Vector3.ZERO
 		_support_lambda = Vector3.ZERO
+		_transport_lambdas.fill(Vector3.ZERO)
 		for iteration in _config.solver_iterations:
 			_solve_drag(h)
 			# Alternating sweep direction avoids a bias toward one end.
@@ -86,6 +89,8 @@ func capture_state() -> Dictionary:
 	var data := RopeState.encode(_config, _positions, _previous, _inverse_mass,
 		_last_substep, _drag_index, _drag_target, _drag_fraction, _release_u, _release_remaining)
 	data.support = {"u": get_support_u(), "target": [_support_target.x, _support_target.y, _support_target.z]} if _support_index >= 0 else {}
+	data.transport = []
+	for point in _transport_targets: data.transport.append([point.x,point.y,point.z])
 	return data
 
 
@@ -102,6 +107,7 @@ static func restore_state(data: Dictionary) -> RopeSimulation:
 	simulation._drag_fraction = state.drag_fraction
 	simulation._release_u = state.release_u
 	simulation._release_remaining = state.release_remaining
+	simulation.set_transport_targets(state.transport)
 	if not state.support.is_empty():
 		simulation.begin_support(state.support.u)
 		simulation._support_target = state.support.target
@@ -196,6 +202,7 @@ func update_drag_target(target: Vector3) -> void:
 
 
 func end_drag() -> void:
+	set_transport_targets(PackedVector3Array())
 	_drag_index = -1
 	_drag_fraction = 0.0
 	_drag_lambda = Vector3.ZERO
@@ -233,10 +240,23 @@ func _stabilize_release(index: int, fraction: float) -> void:
 
 
 func _solve_drag(dt: float) -> void:
+	for i in _transport_targets.size():
+		_transport_lambdas[i] = _solve_grip(i,0,_transport_targets[i],_transport_lambdas[i],dt)
 	if _support_index >= 0:
 		_support_lambda = _solve_grip(_support_index, _support_fraction, _support_target, _support_lambda, dt)
 	if _drag_index >= 0:
 		_drag_lambda = _solve_grip(_drag_index, _drag_fraction, _drag_target, _drag_lambda, dt)
+
+func set_transport_targets(targets: PackedVector3Array) -> bool:
+	if not targets.is_empty() and (targets.size() != _positions.size() or _drag_index < 0): return false
+	for target in targets:
+		if not target.is_finite(): return false
+	_transport_targets = targets.duplicate()
+	_transport_lambdas.resize(targets.size())
+	return true
+
+func has_transport_targets() -> bool:
+	return not _transport_targets.is_empty()
 
 
 func _solve_grip(index: int, fraction: float, target: Vector3, multiplier: Vector3, dt: float) -> Vector3:

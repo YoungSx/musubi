@@ -1,4 +1,4 @@
-# Single-mouse ground play (0.7.0)
+# Single-mouse ground play (0.8.0)
 
 ## Player contract
 
@@ -84,7 +84,10 @@ performance or first-time-player usability.
 physical-entrance deduplication and time-based velocity filtering. The same
 screen-space sequence with `1 --jitter` adds two-pixel motion perturbations and
 also preserves the alternating crossing order. See the [complex-case report](complex-case-feasibility.md)
-for the still-failing tightened-knot unwind and full-mannequin lattice gates.
+for the historical failures and the remaining full-mannequin lattice gates.
 Nintendo NERD's [gesture-filtering report](https://www.nerd.nintendo.com/2022/04/29/Switch_Sports.html)
 is a design reference for input robustness, not a claim that Musubi uses
 Nintendo's sensor fusion implementation.
+
+0.8 adds [input-driven material transport](rope-transport.md), passing the full
+single-knot unwind without changing rope length, using Undo or disabling contact.

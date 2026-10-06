@@ -3,7 +3,7 @@ extends RefCounted
 ## Versioned JSON data only. Scene transforms and collision configuration are
 ## owned by the application and must be reattached after restoring a simulation.
 
-const VERSION := 4
+const VERSION := 5
 const CONFIG_RANGES := {
 	"length": Vector2(0.1, 10.0), "segment_count": Vector2(2, 256),
 	"radius": Vector2(0.002, 0.05), "damping": Vector2(0, 20),
@@ -32,7 +32,7 @@ static func encode(config: RopeConfig, positions: PackedVector3Array, previous: 
 	return {"version": VERSION, "config": parameters, "positions": points,
 		"previous": history, "inverse_mass": Array(masses), "last_substep": last_substep,
 		"drag_index": drag_index, "drag_target": _vector(target), "drag_fraction": drag_fraction,
-		"release_u": release_u, "release_remaining": release_remaining, "support": {}}
+		"release_u": release_u, "release_remaining": release_remaining, "support": {}, "transport": []}
 
 
 ## Validate before allocating a simulation; malformed payloads return empty.
@@ -106,7 +106,13 @@ static func decode(data: Dictionary) -> Dictionary:
 		if masses[index] * (1.0 - t) + masses[mini(index + 1, count - 1)] * t <= 0 or (drag >= 0 and absf(coordinate - drag - fraction) < 2.0):
 			return {}
 		decoded_support = {"u": float(support.u), "target": _read_vector(support.target)}
-	return {"config": config, "positions": positions, "previous": previous, "support": decoded_support,
+	var transport: Variant = data.get("transport",[] if data.version < 5 else null)
+	if not transport is Array or (not transport.is_empty() and (transport.size() != count or drag < 0)): return {}
+	var decoded_transport := PackedVector3Array()
+	for point in transport:
+		if not _valid_vector(point): return {}
+		decoded_transport.append(_read_vector(point))
+	return {"config": config, "positions": positions, "previous": previous, "support": decoded_support,"transport":decoded_transport,
 		"inverse_mass": masses, "last_substep": float(data.last_substep),
 		"drag_index": int(drag), "drag_target": _read_vector(data.drag_target), "drag_fraction": float(fraction),
 		"release_u": float(release_u), "release_remaining": float(release_remaining)}

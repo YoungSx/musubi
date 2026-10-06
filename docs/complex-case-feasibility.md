@@ -40,7 +40,7 @@ torso lacing. Screenshots and JSON are emitted to the requested output directory
 Failure reports must remain visible until these gates actually pass. Do not
 count restoring a prebuilt creation or freezing physics as completion.
 
-## 0.7 findings
+## Historical 0.7 findings
 
 - `GroundFaces` splits projected edges at crossings and walks bounded faces.
   Free-tail bridge edges are removed from face boundaries. `PassageChoice`
@@ -62,9 +62,9 @@ count restoring a prebuilt creation or freezing physics as completion.
   fix it and was removed from production code. Do not treat an individual
   crossing or a remembered entrance as evidence of complete untying.
 
-Reproduce the negative acceptance with
+The original negative acceptance was recorded with
 `godot --path . -s res://tools/verify_mouse_ground.gd -- <output> 1 --unwind`.
-This optional diagnostic is expected to return nonzero while the gate is open.
+Version 0.8 now passes this single-knot gate with material transport (see below).
 It writes `mouse-knot.musubi`, so later work can use
 `--resume=<path-to-mouse-knot.musubi>` to reproduce from a real mouse-created knot.
 `tools/probe_long_mouse.gd -- <output>` separately records the long-rope mouse
@@ -77,3 +77,12 @@ rope length, disabling collisions or moving particles outside the solver.
 For the torso target, continuous rear-surface routing and interlocking cell
 retention must pass before attempting a full hexagonal pattern. The current
 implementation does not establish that the requested complete pattern is playable.
+
+## 0.8 update
+
+[Material transport](rope-transport.md) now passes the full single ground-knot
+sequence, including jitter and the previously failing retreat route from a saved
+mouse-created knot. The implementation uses current geometry, not history undo.
+Length and self/body contacts remain active. This closes that specific failure;
+compound-knot unthreading, torso-lattice construction and novice observation are
+still open. The 0.7 observations above are retained as the failure baseline.

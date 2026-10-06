@@ -90,7 +90,7 @@ func test_state_version_and_self_collision_options() -> void:
 	var config := RopeConfig.new()
 	var sim := RopeSimulation.new(config, RopeLayout.hanging(Vector3.ZERO, Vector3.RIGHT, config.length, config.segment_count))
 	var state := sim.capture_state()
-	assert_eq(state.version, 4, "new format records both temporary hand constraints")
+	assert_eq(state.version, 5, "new format records temporary support and transport constraints")
 	assert_true(RopeSimulation.restore_state(state).capture_state().config.self_collision_enabled, "new files enable self collision")
 	var old := state.duplicate(true)
 	old.version = 1
