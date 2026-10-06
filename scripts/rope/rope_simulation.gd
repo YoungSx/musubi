@@ -62,7 +62,8 @@ func step(dt: float) -> void:
 		for iteration in _config.solver_iterations:
 			_solve_drag(h)
 			# Alternating sweep direction avoids a bias toward one end.
-			_solve_distances(alpha, sweep % 2 == 1)
+			for distance_pass in _config.distance_sweeps:
+				_solve_distances(alpha, (sweep+distance_pass) % 2 == 1)
 			if _config.self_collision_enabled:
 				_self_collision.solve(_positions, _previous, _inverse_mass, start, _config.radius, _config.get_rest_length(), _config.self_friction)
 			if _collision != null:

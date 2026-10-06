@@ -1,4 +1,4 @@
-# Local pass assistance (0.5.0)
+# Local pass assistance
 
 The full mannequin remains the default scene. Play mode can now stabilize a
 clear local passage when the player grabs a rope end and moves consistently
@@ -9,10 +9,11 @@ toward it. No candidate names, path list or extra tool is shown to the player.
 - A near-contact closure must bound a sufficiently large, simple, nearly planar
   polygon in 3D. Screen overlap alone is not evidence of an opening.
 - Candidate centerlines must clear the actual mannequin/floor and other rope
-  segments. If the center is blocked, eight bounded side samples search for
-  alternatives such as space beside the torso. The moving tip alone is excluded
-  from rope blocking checks; ordinary collision remains enabled in the solver.
-- More than four distinct candidates causes assistance to decline, rather than
+  segments. If the center is blocked, eight bounded radial strips search for
+  alternatives such as space beside the torso. A bounded immediate tip/tail
+  neighborhood is excluded from route blocking checks; ordinary collision remains
+  enabled in the solver.
+- More than sixteen distinct candidates causes assistance to decline, rather than
   silently favoring the first segments encountered. Equal scores likewise do
   not select a path. Direction, approach trajectory, proximity and recent motion
   determine the score, followed by a 100 ms confidence dwell.
@@ -36,7 +37,7 @@ normal simulation snapshot continue to use the existing format.
 
 ## Verification scope
 
-103 tests cover the existing project and aperture validity, torso occlusion,
+The initial 0.5 milestone's 103 tests covered aperture validity, torso occlusion,
 clear side portals, minimum opening size, nonplanarity, sampling duplicates,
 ambiguity, stationary input, reversal, invalidation and crossing evidence.
 

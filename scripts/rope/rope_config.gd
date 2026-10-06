@@ -20,6 +20,8 @@ extends Resource
 @export_range(1, 32, 1) var substeps: int = 6
 ## Constraint iterations per substep.
 @export_range(1, 64, 1) var solver_iterations: int = 2
+## Cheap alternating length sweeps before the full contact pass.
+@export_range(1, 8, 1) var distance_sweeps: int = 1
 ## Contact passes after each distance sweep. Primitive contacts are static.
 @export_range(1, 8, 1) var collision_iterations: int = 1
 ## Fraction of tangential velocity removed when a particle contacts a surface.
@@ -67,4 +69,4 @@ static func for_length(length_m: float) -> RopeConfig:
 
 ## Numeric ranges are validated by RopeState before this workload check.
 func is_scene_supported() -> bool:
-	return segment_count * substeps * solver_iterations * collision_iterations <= 8192
+	return segment_count * substeps * solver_iterations * collision_iterations <= 8192 and segment_count * substeps * solver_iterations * distance_sweeps <= 32768

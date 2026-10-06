@@ -140,7 +140,7 @@ regression set nor numerical stability establishes correct intended-side choice.
 Do not simply lower capture thresholds to make this one script succeed; use
 labelled wrap/correction pairs and test both errors together.
 
-## Next acceptance work
+## Follow-up verification
 
 ### Follow-up: return motion and loaded steering
 
@@ -162,6 +162,36 @@ but the grip still lags; the 20-stroke replay does not retain a net (4.62% peak
 segment error, no spatial pass activation). A temporary stronger-grip experiment
 improved following but reached 10.84% segment error and was rejected. These are
 separate recognition, solver and usability findings, not a completed-case claim.
+
+### Follow-up: long-rope constraint convergence
+
+New 6 m shoulder-draped ropes use a 0.00004 grip compliance and four alternating
+length sweeps per contact iteration. Other presets and old saved creations retain
+their previous schedule. This separates relatively cheap length convergence from
+the more expensive full collision iterations. Snapshot v6 records the schedule;
+v1–v5 files default to one sweep, and JSON continuation is regression-tested.
+
+The four-sweep complete 20-stroke trace measured 3.48% peak
+segment error (versus 10.84% for the rejected stronger-grip-only experiment),
+0.012050 m minimum grip/body clearance and 0.929 m of actual rear travel. At the
+end of the first rear sweep the grip reached x=-0.036 m, versus x=-0.288 m with
+the earlier soft grip. These are recorded runs, not frame-identical deterministic
+comparisons; input sampling varies with runtime load. The camera stayed fixed.
+The unseeded lacing trace still had no spatial pass and did not retain a net.
+
+Doubling stroke duration did not solve the task: the slow trace reached 5.80%
+peak segment error at a late multi-contact turn. Six sweeps cost more and still
+reached 6.29% in that trace, so that setting was rejected. Four sweeps improve the
+tested loaded-chain convergence and early wrap tracking, but do not establish a
+five-percent bound for every complex manipulation. The slow complex case remains
+a failed acceptance gate, not a passing result hidden by the faster replay.
+
+The separate torso-ring diagnostic now verifies a real passage where a gap exists
+([details](pass-assistance.md)). It does not solve automatic preparation of a
+closed, body-backed gap or ensure the player-created loop stays available while
+regrabbing. Those are explicit remaining interaction failures.
+
+## Next acceptance work
 
 1. Observe first-time players making a front correction, wrapping a specified
    side, abandoning a route and releasing. Ask what they intended before showing

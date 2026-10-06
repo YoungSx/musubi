@@ -8,7 +8,7 @@ in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
 The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: player control during complex manipulation (0.9.0)
+## Current milestone: player control during complex manipulation (0.9.1)
 
 Complex torso lacing is now a stress test of control quality, not a net-completion
 target. Surface capture needs sustained evidence, front-side corrections do not
@@ -17,6 +17,14 @@ mouse does not advance route waypoints. Local body routing preserves the chosen
 entry side and spatial passages take priority over ordinary surface following.
 See the [control-authority audit](docs/control-authority.md) for design sources,
 rendered negative tests and the remaining need for first-time-player observation.
+
+Rim return strokes now preserve their wrap evidence, and a loaded grip can turn
+or retreat without increasing its lead distance. Torso-side passages search a
+bounded radial strip rather than a single point; the incoming tail can follow
+through without being mistaken for a nonlocal obstacle. A controlled ring around
+the full torso passes rendered mouse-driven crossing checks. The unseeded full
+lattice remains incomplete: preparing closed gaps and retaining successive
+interlocking cells are still open.
 
 The default scene retains the full mannequin and its limb/torso collisions.
 An unpinned rope rests naturally across its shoulders. Grab any visible portion
@@ -146,7 +154,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 149 tests passed. A rendered scene smoke check exercised camera orbit,
+All 155 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -164,8 +172,10 @@ the Rope node's held/catch-up state are application data and are not included
 in this simulation snapshot. `MusubiSceneState` adds these fields for full
 creation files, validates before changing the live scene and replaces files
 only after a successful temporary-file write. Invalid files leave the scene intact.
-Simulation format v5 adds distributed transport targets to the previous support,
-fractional-grip and release state; v1–v4 snapshots remain readable. Existing v1 creations load
+Simulation format v6 records independent length sweeps; v1–v5 retain their original
+single-sweep schedule. Version 5 added distributed transport targets to the support,
+fractional-grip and release state. New 6 m shoulder ropes use four length sweeps
+and a firmer soft grip; contacts remain enabled. Existing v1 creations load
 with self-contact disabled to preserve their behavior; Reset starts a new rope
 with the current default (enabled). Debug shows the active setting and last-pass
 contact count. See [self-contact implementation and verification](docs/rope-self-collision.md).

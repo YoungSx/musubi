@@ -3,7 +3,7 @@ extends RefCounted
 ## Versioned JSON data only. Scene transforms and collision configuration are
 ## owned by the application and must be reattached after restoring a simulation.
 
-const VERSION := 5
+const VERSION := 6
 const CONFIG_RANGES := {
 	"length": Vector2(0.1, 10.0), "segment_count": Vector2(2, 256),
 	"radius": Vector2(0.002, 0.05), "damping": Vector2(0, 20),
@@ -13,6 +13,7 @@ const CONFIG_RANGES := {
 	"max_steps_per_tick": Vector2(1, 16), "drag_compliance": Vector2(0.00001, 0.01),
 	"drag_speed": Vector2(0.1, 5),
 	"self_friction": Vector2(0, 1),
+	"distance_sweeps": Vector2(1, 8),
 }
 
 
@@ -49,6 +50,7 @@ static func decode(data: Dictionary) -> Dictionary:
 	config.self_collision_enabled = enabled
 	for key in CONFIG_RANGES:
 		var value: Variant = data.config.get(key, 0.18 if key == "self_friction" and data.version == 1 else null)
+		if key == "distance_sweeps" and data.version < 6 and not data.config.has(key): value = 1
 		var limits: Vector2 = CONFIG_RANGES[key]
 		if not _number(value) or value < limits.x - 1e-9 or value > limits.y + 1e-9:
 			return {}

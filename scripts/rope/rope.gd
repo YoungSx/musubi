@@ -115,6 +115,9 @@ func new_rope(length_m: float) -> bool:
 		config.drag_compliance = 0.00008
 		config.damping = 4.0
 		config.friction = 0.35
+		if length_m >= 6.0:
+			config.drag_compliance = 0.00004
+			config.distance_sweeps = 4
 	reset()
 	return true
 
