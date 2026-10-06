@@ -142,6 +142,27 @@ labelled wrap/correction pairs and test both errors together.
 
 ## Next acceptance work
 
+### Follow-up: return motion and loaded steering
+
+The detailed lacing trace exposed a recognition bug: outside travel accumulated
+both outward and inward motion. A small rim excursion therefore lost its wrap
+evidence on the way back, falsely interpreting the return as an escape. Escape
+now uses displacement from the departure point. Clear outward departure still
+releases assistance; front-only correction and tremor retain their negative tests.
+
+A second bug spent the entire movement budget on existing hand lag, preventing
+turning and retreat when the solver was under load. The lead envelope now limits
+outward distance while allowing bounded steering inside it, with body-segment
+clearance checked before accepting the new target. There is still no idle route
+advance. The rendered control-authority replay passes after both changes.
+
+The lacing probe now exports per-frame recognition state, requested route target,
+actual grip and their gaps. Several upper-body returns now acquire rear intent,
+but the grip still lags; the 20-stroke replay does not retain a net (4.62% peak
+segment error, no spatial pass activation). A temporary stronger-grip experiment
+improved following but reached 10.84% segment error and was rejected. These are
+separate recognition, solver and usability findings, not a completed-case claim.
+
 1. Observe first-time players making a front correction, wrapping a specified
    side, abandoning a route and releasing. Ask what they intended before showing
    diagnostic state. Report false captures and effort to escape, not just success.

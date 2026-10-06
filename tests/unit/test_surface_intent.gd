@@ -55,6 +55,22 @@ func test_front_only_reversal_does_not_mean_wrap() -> void:
 	for i in range(1,9): intent.update(near_edge-Vector2(i*2,0),camera,start,0.012,collision,intent._target)
 	assert_true(not intent.rear,"reversing on the visible face without leaving its silhouette stays in front")
 
+func test_returning_from_rim_is_not_counted_as_escape() -> void:
+	var camera := _camera()
+	var collision := _collision()
+	var start := Vector3(0,0,0.6)
+	var center := camera.unproject_position(start)
+	var edge := camera.unproject_position(Vector3(0.53,0,0))+Vector2(2,0)
+	var intent := SurfaceIntent.new()
+	intent.begin(start,center)
+	_prime(intent,camera,collision,start,center)
+	for i in range(1,41):
+		intent.update((center+Vector2(20,0)).lerp(edge,float(i)/40),camera,start,0.012,collision,intent._target)
+	for i in range(1,10): intent.update(edge+Vector2(i,0),camera,start,0.012,collision,intent._target)
+	for i in range(1,27): intent.update(edge+Vector2(9-i,0),camera,start,0.012,collision,intent._target)
+	assert_true(intent.active,"return travel cannot add to the distance away from the silhouette")
+	assert_true(intent.rear,"small out-and-back motion retains the intended wrap evidence")
+
 func test_surface_route_reaches_rear_without_cutting_through_body() -> void:
 	var collision := _collision()
 	var route := SurfaceRoute.new()
@@ -258,6 +274,20 @@ func test_changed_direction_cancels_pending_wrap() -> void:
 	intent._wrap_direction = Vector2.RIGHT
 	for i in range(1,6): intent.update(screen-Vector2(i*2,0),camera,point,0.012,collision,point)
 	assert_true(not intent._via_pending and not intent.rear,"withdrawal cancels the pending rear interpretation")
+
+func test_loaded_hand_can_turn_and_retreat_without_more_lead() -> void:
+	var collision := RopeCollision.new()
+	collision.floor_enabled = false
+	var intent := SurfaceIntent.new()
+	intent._target = Vector3.RIGHT*0.048
+	intent.requested_goal = Vector3.FORWARD
+	var turned := intent._advance(Vector3.ZERO,0.012,collision,0.02,PackedVector3Array(),-1)
+	assert_true(turned.z < -0.005,"a loaded grip can steer tangentially without waiting for zero lag")
+	assert_true(turned.length() <= 0.048001,"steering cannot increase the hand lead")
+	assert_true(turned.distance_to(Vector3.RIGHT*0.048) <= 0.020001,"steering is bounded by expressed motion")
+	intent.requested_goal = -turned
+	var reversed := intent._advance(Vector3.ZERO,0.012,collision,0.02,PackedVector3Array(),-1)
+	assert_true(reversed.length() < turned.length()-0.01,"retreat reduces the loaded gap immediately")
 
 func _camera() -> Camera3D:
 	var camera := add_to_tree(Camera3D.new()) as Camera3D

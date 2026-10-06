@@ -17,6 +17,8 @@ var _entry_time := 0.0
 var _entry_travel := 0.0
 var _entry_origin := Vector2.ZERO
 var _outside_travel := 0.0
+var _outside_origin := Vector2.ZERO
+var _outside := false
 var _rim_point := Vector3.ZERO
 var _via := Vector3.ZERO
 var _via_pending := false
@@ -36,6 +38,7 @@ func begin(point: Vector3,screen: Vector2) -> void:
 	_entry_time = 0
 	_entry_travel = 0
 	_outside_travel = 0
+	_outside = false
 	confidence = 0
 	_entry_origin = screen
 	_rim_point = point
@@ -45,6 +48,7 @@ func begin(point: Vector3,screen: Vector2) -> void:
 	_rim_exit_seen = false
 
 func update(screen: Vector2,camera: Camera3D,raw: Vector3,radius: float,collision: RopeCollision,actual: Vector3,points := PackedVector3Array(),grip_u := -1.0,delta := 1.0/60.0) -> Vector3:
+	var previous_screen := _last_screen
 	var movement := screen-_last_screen
 	_last_screen = screen
 	if movement.length_squared() < 0.01: return _target if active else raw
@@ -70,7 +74,12 @@ func update(screen: Vector2,camera: Camera3D,raw: Vector3,radius: float,collisio
 		_entry_travel = 0
 		if active:
 			if _rim: _rim_exit_seen = true
-			_outside_travel += movement.length()
+			if not _outside:
+				_outside_origin = previous_screen
+				_outside = true
+			# Returning toward the edge is not a withdrawal. Measure excursion,
+			# not total travel: an out-and-back stroke must retain its wrap evidence.
+			_outside_travel = screen.distance_to(_outside_origin)
 			if _outside_travel >= camera.get_viewport().get_visible_rect().size.y*0.025:
 				begin(raw,screen)
 				return raw
@@ -78,6 +87,7 @@ func update(screen: Vector2,camera: Camera3D,raw: Vector3,radius: float,collisio
 			return _advance(actual,radius,collision,budget,points,grip_u)
 		return raw
 	_outside_travel = 0
+	_outside = false
 	if not active:
 		if delta >= 0.099: _entry_time = 0
 		if _entry_time <= 0: _entry_origin = screen-movement
@@ -132,13 +142,19 @@ func rebase_target(target: Vector3,screen: Vector2) -> void:
 func _advance(actual: Vector3,radius: float,collision: RopeCollision,budget: float,points: PackedVector3Array,grip_u: float) -> Vector3:
 	# Complete only the destination already expressed by the pointer. A leading
 	# waypoint stays close to the actual grip, so it cannot cut a body corner.
-	budget = minf(budget,maxf(0,radius*4-_target.distance_to(actual)))
 	if _via_pending and _target.distance_to(_via) < radius*2 and actual.distance_to(_via) < radius*4:
 		_via_pending = false
 	if budget > 0:
 		var goal := _via if _via_pending else requested_goal
 		var proposed := route.advance(_target,goal,minf(budget,radius*2),radius,collision)
 		proposed = SurfaceClearance.over_target(proposed,points,grip_u,radius,collision)
-		_target = _target.move_toward(proposed,budget)
+		proposed = _target.move_toward(proposed,budget)
+		# A saturated hand gap limits outward lead, not steering authority.
+		# Subtracting the old gap from the movement budget also prevented turning
+		# or backing out while the solver lagged under load.
+		var lead := maxf(radius*4,_target.distance_to(actual))
+		proposed = actual+(proposed-actual).limit_length(lead)
+		if collision.is_body_segment_clear(_target,proposed,radius):
+			_target = proposed
 	_target = collision.project_point(_target,radius)
 	return _target

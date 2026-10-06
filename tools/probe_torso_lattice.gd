@@ -11,6 +11,8 @@ var _rear_before := false
 var _output := ""
 var _duration_scale := 1.0
 var pass_frames := 0
+var phase := "lift"
+var samples: Array[String] = ["phase,time_us,pointer_x,pointer_y,target_x,target_y,actual_x,actual_y,actual_z,active,rear,rim,exit_seen,via_pending,pass_state,hand_gap,goal_gap,route_x,route_y,route_z,requested_x,requested_y,requested_z"]
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -39,6 +41,7 @@ func _run() -> void:
 	# Alternate sweeps across the silhouette, then diagonals at successive heights.
 	var step := 0
 	for goal in [Vector2(595,300),Vector2(560,300),Vector2(595,300),Vector2(690,300),Vector2(730,300),Vector2(690,315),Vector2(600,345),Vector2(555,345),Vector2(600,345),Vector2(690,345),Vector2(730,345),Vector2(690,360),Vector2(600,395),Vector2(555,395),Vector2(600,395),Vector2(690,395),Vector2(730,395),Vector2(665,375),Vector2(600,330),Vector2(670,290)]:
+		phase = "stroke_%d" % (step+1)
 		await _drag(goal,1.5)
 		step += 1
 		print("Lacing step=",step," actual=",app.rope.get_simulation().get_grip_position()," rear intent=",app.interaction_manager._rope_interaction._surface_intent.rear," peak stretch=",peak_stretch)
@@ -58,6 +61,9 @@ func _run() -> void:
 		"complete_pattern":"not certified by motion or height metrics; inspect crossings and cells"}
 	var file := FileAccess.open(_output.path_join("lattice-input-report.json"),FileAccess.WRITE)
 	file.store_string(JSON.stringify(report,"\t"))
+	file.close()
+	file = FileAccess.open(_output.path_join("lattice-input-trace.csv"),FileAccess.WRITE)
+	file.store_string("\n".join(samples)+"\n")
 	file.close()
 	MusubiSceneState.write_file(_output.path_join("lattice-attempt.musubi"),MusubiSceneState.capture(app))
 	print(JSON.stringify(report))
@@ -94,6 +100,10 @@ func _drag(goal: Vector2,duration: float) -> void:
 		var sim := app.rope.get_simulation()
 		if app.interaction_manager._rope_interaction.get_pass_state() != RopePassAssist.State.FREE: pass_frames += 1
 		var actual := sim.get_grip_position()
+		var interaction := app.interaction_manager._rope_interaction
+		var intent := interaction._surface_intent
+		var screen_target := app.camera_rig.get_camera().unproject_position(sim.get_drag_target())
+		samples.append("%s,%d,%f,%f,%f,%f,%f,%f,%f,%s,%s,%s,%s,%s,%d,%f,%f,%f,%f,%f,%f,%f,%f" % [phase,Time.get_ticks_usec(),pointer.x,pointer.y,screen_target.x,screen_target.y,actual.x,actual.y,actual.z,intent.active,intent.rear,intent._rim,intent._rim_exit_seen,intent._via_pending,interaction.get_pass_state(),actual.distance_to(sim.get_drag_target()),actual.distance_to(intent.requested_goal),intent._target.x,intent._target.y,intent._target.z,intent.requested_goal.x,intent.requested_goal.y,intent.requested_goal.z])
 		peak_stretch = maxf(peak_stretch,sim.get_max_segment_stretch())
 		least_clearance = minf(least_clearance,app.rope.get_collision().get_body_clearance(actual))
 		var in_rear := actual.y > 0.8 and actual.y < 1.45 and actual.z < -0.06 and absf(actual.x) < 0.22
