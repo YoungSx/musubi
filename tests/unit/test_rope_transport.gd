@@ -84,6 +84,17 @@ func test_both_endpoints_transport_without_deleting_material() -> void:
 		assert_true(targets[end].distance_to(points[end]) > 0.001,"selected end retracts along the current path")
 		assert_true(targets[points.size()-1-end].distance_to(points[points.size()-1-end]) > 0.001,"opposite end supplies the displaced material")
 
+func test_small_nudges_do_not_take_over_the_whole_rope() -> void:
+	var points := _points()
+	var camera := _camera()
+	var transport := RopeTransport.new()
+	transport.begin(points,1,0.006,0)
+	var axis := (camera.unproject_position(points[-2])-camera.unproject_position(points[-1])).normalized()
+	for i in 30: transport.update(axis*0.2,camera,points,0.006,1.0/60)
+	assert_true(not transport.active,"a small local correction must not engage whole-rope guidance")
+	transport.update(axis*0.2,camera,points,0.006,0.1)
+	assert_true(transport._screen_travel < 1,"a pause expires old approach evidence")
+
 func test_material_extension_cannot_request_motion_below_floor() -> void:
 	var points := _points()
 	points[0].y = 0.01205
@@ -137,10 +148,13 @@ func test_camera_change_discards_old_screen_axis_without_moving_target() -> void
 	var screen := app.camera_rig.get_camera().unproject_position(sim.get_point(app.rope.config.segment_count))
 	interaction.begin(screen)
 	interaction._transport.active = true
+	interaction._surface_intent.active = true
+	interaction._surface_intent.rear = true
 	sim.set_transport_targets(sim.get_positions())
 	var target := sim.get_drag_target()
 	app.camera_rig.orbit(Vector2(0.1,0.1))
 	app.camera_rig._process(0.1)
 	interaction.move(screen)
 	assert_true(not interaction._transport.active and not sim.has_transport_targets(),"old camera axis cannot continue transporting")
+	assert_true(not interaction._surface_intent.active and not interaction._surface_intent.rear,"a new view cannot inherit an old rear-side inference")
 	assert_eq(sim.get_drag_target(),target,"camera motion is not pointer intent")

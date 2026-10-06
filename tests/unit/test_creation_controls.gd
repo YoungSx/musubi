@@ -54,6 +54,12 @@ func test_long_floor_rope_fits_before_interaction() -> void:
 	assert_true(frame.has_point(camera.unproject_position(Vector3(0,1.75,0))),"full mannequin remains framed")
 	assert_true(camera.unproject_position(Vector3(0,1.75,0)).y > 110,"figure clears the title area")
 
+func test_long_rope_yields_instead_of_batching_a_hitch() -> void:
+	var app := _app()
+	app.new_rope(6)
+	assert_eq(app.rope.advance(0.2),1,"long-rope catch-up cannot monopolize a render tick")
+	assert_eq(app.rope.advance(1.0/60),1,"backlog remains bounded on the following tick")
+
 
 func _app() -> AppController:
 	var app := add_to_tree(load("res://scenes/main/main.tscn").instantiate()) as AppController

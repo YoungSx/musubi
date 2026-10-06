@@ -1,7 +1,12 @@
 # Complex-case acceptance (in progress)
 
-The target is a continuous long-rope lattice on the complete mannequin, created
-through ordinary mouse input, with crossings and tension surviving release.
+Complex long-rope lacing on the complete mannequin is an interaction stress
+scenario, not the product's completion objective. Use ordinary mouse input to
+audit predictable intentions, false capture, excessive attraction, correction,
+escape and release. A beautiful completed net does not prove these properties.
+See the [control-authority audit](control-authority.md) for primary Nintendo
+references, implemented control contracts and explicit acceptance limits.
+
 A prearranged lattice is a solver diagnostic, not evidence that the interaction
 can tie the requested structure. No real-person restraint is tested.
 
@@ -28,9 +33,9 @@ torso lacing. Screenshots and JSON are emitted to the requested output directory
 
 - Multiple possible passages: retain hypotheses, reject ties, converge with
   deliberate trajectory changes; test actual adjacent loops as well as scoring.
-- Continuous unwind: remove a player-created tightened structure using mouse
-  gestures. Reversing recorded screen coordinates currently buckles the tail and
-  can recreate the same knot. An endpoint crossing counter alone is insufficient.
+- Continuous unwind: the 0.8 single-knot replay passes; multi-knot usability and
+  control hand-back remain open. Reversing recorded screen coordinates alone can
+  buckle the tail. An endpoint crossing counter alone is insufficient.
 - Novice usability: test jitter, speed, pickup tolerance and clear in-world
   feedback, then observe real first-time players. Automated scripts cannot certify
   that an unfamiliar person understands the gesture.

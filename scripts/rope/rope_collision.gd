@@ -10,6 +10,7 @@ const MAX_MOTION_SAMPLES := 64
 
 var floor_enabled := true
 var floor_height := 0.0
+var geometry_revision := 0
 var _parts: Array[Collider] = []
 var _bounds := AABB()
 
@@ -83,6 +84,7 @@ class Collider:
 
 
 func configure(config: MannequinConfig, world_transform := Transform3D.IDENTITY, ground_height := 0.0) -> void:
+	geometry_revision += 1
 	_parts.clear()
 	_bounds = AABB()
 	floor_height = ground_height
@@ -117,6 +119,29 @@ func get_body_clearance(point: Vector3) -> float:
 	for part in _parts:
 		result = minf(result, part.clearance(point))
 	return result
+
+func get_body_bounds() -> AABB:
+	return _bounds
+
+func get_slice_parts(height: float,padding: float) -> Array[Collider]:
+	var result: Array[Collider] = []
+	for part in _parts:
+		if height >= part.bounds.position.y-padding and height <= part.bounds.end.y+padding:
+			result.append(part)
+	return result
+
+func get_body_normal(point: Vector3) -> Vector3:
+	var epsilon := 0.0001
+	var gradient := Vector3(get_body_clearance(point+Vector3.RIGHT*epsilon)-get_body_clearance(point-Vector3.RIGHT*epsilon),get_body_clearance(point+Vector3.UP*epsilon)-get_body_clearance(point-Vector3.UP*epsilon),get_body_clearance(point+Vector3.BACK*epsilon)-get_body_clearance(point-Vector3.BACK*epsilon))
+	return gradient.normalized() if gradient.is_finite() and gradient.length_squared() > 1e-12 else Vector3.ZERO
+
+func is_body_segment_clear(a: Vector3,b: Vector3,radius: float) -> bool:
+	var bounds := AABB(a.min(b),(b-a).abs()).grow(radius)
+	for part in _parts:
+		if not bounds.intersects(part.bounds): continue
+		var contact := part.segment_contact(a,b,radius)
+		if Vector3(contact.x,contact.y,contact.z).length_squared() > 1e-12: return false
+	return true
 
 
 ## Read-only body query shared by interaction; no physics-server timing or

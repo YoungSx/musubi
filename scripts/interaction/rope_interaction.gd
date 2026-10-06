@@ -28,6 +28,7 @@ var _ground_simulation_id := 0
 var _ground_validation_time := 0.0
 var _surface_intent := SurfaceIntent.new()
 var _transport := RopeTransport.new()
+var _returning_control := false
 
 
 func set_pass_assist_enabled(enabled: bool) -> void:
@@ -61,6 +62,7 @@ func tick(delta: float) -> void:
 		return
 	_validation_time = 0.05
 	if not _pass_assist.validate_active(_rope.get_simulation().get_positions(), _rope.config.radius, _picked_u, _rope.get_collision()):
+		_surface_intent.rebase_target(_rope.get_simulation().get_drag_target(),_last_screen_position)
 		rebase(_last_screen_position) # Keep the hand target fixed; only discard the path.
 
 
@@ -82,12 +84,13 @@ func begin(screen_position: Vector2) -> bool:
 	var point := _rope.get_simulation().get_point(base).lerp(_rope.get_simulation().get_point(mini(base + 1, _rope.get_simulation().get_point_count() - 1)), coordinate - base)
 	var floor_height := _rope.get_collision().floor_height if _rope.get_collision() != null else 0.0
 	_ground_hand.begin(point, floor_height)
-	_ground_hand.active = _ground_hand.active and _assist_enabled
+	_ground_hand.active = _ground_hand.active and _assist_enabled and _rope.initial_layout == Rope.InitialLayout.FLOOR
 	_drag_plane = Plane(Vector3.UP if _ground_hand.active else _camera.global_basis.z.normalized(), point)
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection == null or not _rope.begin_grip(_picked_u):
 		return false
 	_selected_index = index
+	_returning_control = false
 	_grab_offset = point - (intersection as Vector3)
 	_last_screen_position = screen_position
 	_drag_origin = _camera.global_position
@@ -120,17 +123,24 @@ func move(screen_position: Vector2) -> void:
 		return
 	var intersection: Variant = _project_on_plane(screen_position)
 	if intersection != null:
+		if _returning_control:
+			var previous: Variant = _project_on_plane(screen_position-screen_delta)
+			if previous != null:
+				_grab_offset = _grab_offset.move_toward(Vector3.ZERO,(intersection as Vector3).distance_to(previous)*0.5)
+				_returning_control = _grab_offset.length_squared() > 1e-10
 		var target := (intersection as Vector3) + _grab_offset
 		var now := Time.get_ticks_usec()
 		var dt := minf(float(now - _last_intent_usec) / 1000000.0, 0.1)
 		var sim := _rope.get_simulation()
 		var floor_height := _rope.get_collision().floor_height if _rope.get_collision() != null else 0.0
+		var was_passing := _pass_assist.state != RopePassAssist.State.FREE
 		if _assist_enabled and _ground_hand.active:
 			var was_transporting := _transport.active
 			var guide := _transport.update(screen_delta,_camera,sim.get_positions(),_rope.config.radius,dt)
 			sim.set_transport_targets(guide)
 			if was_transporting and guide.is_empty():
 				rebase(screen_position)
+				_returning_control = true
 				_surface_intent.begin(sim.get_grip_position(),screen_position)
 				_last_intent_usec = now
 				return
@@ -140,9 +150,12 @@ func move(screen_position: Vector2) -> void:
 				_rope.update_drag_target(guide[0] if _picked_u < 0.5 else guide[-1])
 				_last_intent_usec = now
 				return
-		if _assist_enabled and (_picked_u <= 0.025 or _picked_u >= 0.975):
-			target = _surface_intent.update(screen_position,_camera,target,_rope.config.radius,_rope.get_collision(),sim.get_grip_position())
+		if _assist_enabled and not was_passing and (_picked_u <= 0.025 or _picked_u >= 0.975):
+			var was_surface := _surface_intent.active
+			target = _surface_intent.update(screen_position,_camera,target,_rope.config.radius,_rope.get_collision(),sim.get_grip_position(),sim.get_positions(),_picked_u,dt)
+			if was_surface and not _surface_intent.active: _returning_control = true
 		if _surface_intent.active:
+			_returning_control = false
 			_stop_support()
 			if _ground_hand.active: _ground_intent.clear()
 			_ground_hand.active = false
@@ -151,15 +164,20 @@ func move(screen_position: Vector2) -> void:
 			target = _ground_intent.update(target, sim.get_grip_position(), sim.get_positions(), _picked_u, _rope.config.radius, floor_height, _rope.get_collision(), dt)
 			_sync_support()
 			target = _ground_hand.resolve(target, sim.get_positions(), _picked_u, _rope.config.radius, floor_height, _ground_intent.prefer_under, dt)
-		if _assist_enabled and not _ground_hand.active and not _surface_intent.active and now >= _manual_depth_until_usec:
+		if _assist_enabled and not _ground_hand.active and now >= _manual_depth_until_usec:
 			target = _pass_assist.update(target, sim.get_grip_position(), sim.get_positions(), _rope.config.radius,
 				_picked_u, _camera.global_basis.z.normalized(), _rope.get_collision(), dt)
 		else:
 			_pass_assist.begin(target)
 		_last_intent_usec = now
 		_rope.update_drag_target(target)
+		if _surface_intent.active:
+			rebase(screen_position,false)
 		if _pass_assist.needs_rebase:
-			rebase(screen_position)
+			_surface_intent.rebase_target(target,screen_position)
+			rebase(screen_position,false)
+		elif not was_passing and _pass_assist.state != RopePassAssist.State.FREE:
+			rebase(screen_position,false)
 
 
 ## A camera move must not be interpreted as a hand move. Keep the requested
@@ -167,6 +185,8 @@ func move(screen_position: Vector2) -> void:
 func rebase(screen_position: Vector2, reset_assist := true) -> void:
 	if _selected_index < 0:
 		return
+	if not _camera_reference.is_equal_approx(_camera.global_transform):
+		_surface_intent.begin(_rope.get_simulation().get_drag_target(),screen_position)
 	if _transport.active and not _camera_reference.is_equal_approx(_camera.global_transform):
 		_transport.stop()
 		_rope.get_simulation().set_transport_targets(PackedVector3Array())
@@ -209,7 +229,9 @@ func get_drag_depth() -> float:
 
 
 func end() -> void:
+	_returning_control = false
 	_transport.stop()
+	_surface_intent.begin(Vector3.ZERO,Vector2.ZERO)
 	if _selected_index >= 0 and is_instance_valid(_rope):
 		_rope.end_drag()
 	_stop_support()
@@ -223,7 +245,9 @@ func get_selected_index() -> int:
 
 
 func cancel() -> void:
+	_returning_control = false
 	_transport.stop()
+	_surface_intent.begin(Vector3.ZERO,Vector2.ZERO)
 	_rope.cancel_drag()
 	_owns_support = false
 	_ground_intent.clear()

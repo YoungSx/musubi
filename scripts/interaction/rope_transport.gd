@@ -10,6 +10,7 @@ var _arc := PackedFloat64Array()
 var _end := 0
 var _dwell := 0.0
 var _travel := 0.0
+var _screen_travel := 0.0
 var _velocity := Vector2.ZERO
 var _abandoned := false
 var _screen_axis := Vector2.ZERO
@@ -25,6 +26,7 @@ func begin(points: PackedVector3Array,u: float,radius: float,floor_y: float,coll
 	progress = 0
 	_dwell = 0
 	_travel = 0
+	_screen_travel = 0
 	_velocity = Vector2.ZERO
 	_abandoned = false
 	_curve = points.duplicate()
@@ -57,13 +59,22 @@ func update(delta: Vector2,camera: Camera3D,points: PackedVector3Array,radius: f
 	var direction := _screen_axis if active else projected.normalized()
 	var alignment := _velocity.normalized().dot(direction)
 	if not active:
+		if dt >= 0.099:
+			_dwell = 0
+			_travel = 0
+			_screen_travel = 0
 		if alignment < 0.8:
 			_dwell = 0
 			_travel = 0
+			_screen_travel = 0
 			return PackedVector3Array()
 		_dwell += minf(dt,0.04)
 		_travel += maxf(0,delta.dot(direction))*0.03/projected.length()
-		if _dwell < 0.12 or _travel < radius: return PackedVector3Array()
+		_screen_travel += maxf(0,delta.dot(direction))
+		if _dwell < 0.12 or _travel < radius*6 or _screen_travel < camera.get_viewport().get_visible_rect().size.y*0.015: return PackedVector3Array()
+		if crossing_word(points,radius).size() < 6:
+			eligible = false
+			return PackedVector3Array()
 		# Refresh the guide at commitment; free approach may have moved the rope.
 		_curve = points.duplicate()
 		_payout.configure(_curve,points.size()-1-_end,_radius,_ground_height,_collision)

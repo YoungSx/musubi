@@ -50,6 +50,9 @@ static func for_length(length_m: float) -> RopeConfig:
 		result.segment_count = 96
 	elif is_equal_approx(length_m, 6.0):
 		result.segment_count = 192
+		# One expensive step per render tick avoids catch-up batches starving
+		# pointer feedback. Fixed-step physics may slow down under overload.
+		result.max_steps_per_tick = 1
 	else:
 		return null
 	result.length = length_m
