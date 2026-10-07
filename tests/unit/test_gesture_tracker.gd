@@ -5,6 +5,10 @@ var _primary: Array[Vector2] = []
 var _secondary: Array[Vector2] = []
 var _zooms: Array[float] = []
 var _starts: Array[Vector2] = []
+var _orbit: Array[Vector2] = []
+var _pan: Array[Vector2] = []
+var _touch_moves: Array[int] = []
+var _touch_ends: Array[int] = []
 var _ends := 0
 var _cancels := 0
 
@@ -19,6 +23,11 @@ func _init() -> void:
 	_tracker.primary_cancelled.connect(_on_primary_cancelled)
 	_tracker.secondary_drag.connect(_on_secondary_drag)
 	_tracker.zoom.connect(_on_zoom)
+	_tracker.touch_orbit.connect(_on_orbit)
+	_tracker.touch_pan.connect(_on_pan)
+	_tracker.touch_zoom.connect(_on_zoom)
+	_tracker.touch_moved.connect(_on_touch_move)
+	_tracker.touch_ended.connect(_on_touch_end)
 
 
 func _on_primary_drag(_position: Vector2, relative: Vector2) -> void:
@@ -43,34 +52,6 @@ func _on_secondary_drag(relative: Vector2) -> void:
 
 func _on_zoom(factor: float) -> void:
 	_zooms.append(factor)
-
-
-func test_single_finger_emits_primary_drag() -> void:
-	_tracker.handle(_touch(0, Vector2(100, 100), true))
-	_tracker.handle(_drag(0, Vector2(110, 95)))
-	assert_eq(_primary.size(), 1, "one primary drag")
-	assert_eq(_primary[0], Vector2(10, -5), "primary relative")
-	assert_true(_secondary.is_empty() and _zooms.is_empty(), "no secondary gestures")
-
-
-func test_two_fingers_emit_pan_and_pinch() -> void:
-	_tracker.handle(_touch(0, Vector2(100, 100), true))
-	_tracker.handle(_touch(1, Vector2(200, 100), true))
-	_tracker.handle(_drag(1, Vector2(300, 100)))
-	assert_true(_primary.is_empty(), "no primary drag with two fingers")
-	assert_eq(_secondary.size(), 1, "one secondary drag")
-	assert_eq(_secondary[0], Vector2(50, 0), "centroid motion")
-	assert_eq(_zooms.size(), 1, "one zoom")
-	assert_near(_zooms[0], 2.0, "spread doubled")
-
-
-func test_release_and_reset_clear_pointers() -> void:
-	_tracker.handle(_touch(0, Vector2.ZERO, true))
-	_tracker.handle(_touch(1, Vector2.ONE, true))
-	_tracker.handle(_touch(0, Vector2.ZERO, false))
-	assert_eq(_tracker.get_pointer_count(), 1, "one pointer after release")
-	_tracker.reset()
-	assert_eq(_tracker.get_pointer_count(), 0, "no pointers after reset")
 
 
 func test_mouse_left_drag_and_wheel() -> void:
@@ -102,44 +83,6 @@ func test_emulated_mouse_is_ignored() -> void:
 	assert_eq(_tracker.get_pointer_count(), 0, "no pointer registered")
 
 
-func test_primary_lifecycle_and_duplicate_release() -> void:
-	_tracker.handle(_touch(0, Vector2.ONE, true))
-	_tracker.handle(_touch(0, Vector2.ONE, false))
-	_tracker.handle(_touch(0, Vector2.ONE, false))
-	assert_eq(_starts, [Vector2.ONE], "one primary start")
-	assert_eq(_ends, 1, "one primary end")
-	assert_eq(_cancels, 0, "ordinary release is not cancellation")
-
-
-func test_two_finger_transition_never_restarts_primary_until_full_release() -> void:
-	_tracker.handle(_touch(0, Vector2(10, 10), true))
-	_tracker.handle(_touch(1, Vector2(20, 10), true))
-	assert_eq(_cancels, 1, "second finger cancels primary")
-	_tracker.handle(_touch(1, Vector2(20, 10), false))
-	_tracker.handle(_drag(0, Vector2(30, 10)))
-	assert_eq(_starts.size(), 1, "remaining finger does not start another pick")
-	assert_eq(_primary.size(), 1, "remaining finger still drives camera motion")
-	_tracker.handle(_touch(0, Vector2(30, 10), false))
-	assert_eq(_ends, 0, "cancelled primary does not also end")
-	_tracker.handle(_touch(2, Vector2.ONE, true))
-	assert_eq(_starts.size(), 2, "new gesture may pick again")
-
-
-func test_cancel_and_reset_emit_once_and_clear_capture() -> void:
-	_tracker.handle(_touch(0, Vector2.ONE, true))
-	var cancel := _touch(0, Vector2.ONE, true)
-	cancel.canceled = true
-	assert_true(_tracker.is_captured_release(cancel), "cancel treated as release even if pressed is true")
-	_tracker.handle(cancel)
-	_tracker.reset()
-	assert_eq(_cancels, 1, "cancel emitted once")
-	assert_eq(_tracker.get_pointer_count(), 0, "cancel removed pointer")
-	assert_true(not _tracker.is_captured_release(cancel), "cancel no longer captured")
-	_tracker.handle(_touch(1, Vector2.ZERO, true))
-	_tracker.reset()
-	assert_eq(_cancels, 2, "reset cancels active primary")
-
-
 func _touch(index: int, position: Vector2, pressed: bool) -> InputEventScreenTouch:
 	var event := InputEventScreenTouch.new()
 	event.index = index
@@ -153,3 +96,82 @@ func _drag(index: int, position: Vector2) -> InputEventScreenDrag:
 	event.index = index
 	event.position = position
 	return event
+
+func _on_orbit(relative: Vector2) -> void: _orbit.append(relative)
+func _on_pan(relative: Vector2) -> void: _pan.append(relative)
+func _on_touch_move(id: int, _position: Vector2) -> void: _touch_moves.append(id)
+func _on_touch_end(id: int) -> void: _touch_ends.append(id)
+
+
+func test_two_free_fingers_orbit_and_pinch_three_pan() -> void:
+	_tracker.handle(_touch(5, Vector2(100, 100), true))
+	_tracker.handle(_drag(5, Vector2(110, 100)))
+	assert_true(_orbit.is_empty() and _pan.is_empty(), "one free finger does not move camera")
+	_tracker.handle(_touch(9, Vector2(210, 100), true))
+	_tracker.handle(_drag(9, Vector2(310, 100)))
+	assert_eq(_orbit, [Vector2(50, 0)], "two free touches orbit by centroid")
+	assert_eq(_zooms, [2.0], "two free touches pinch")
+	_tracker.handle(_touch(2, Vector2(210, 200), true))
+	_tracker.handle(_drag(2, Vector2(240, 230)))
+	assert_eq(_pan, [Vector2(10, 10)], "three free touches pan")
+	assert_eq(_orbit.size(), 1, "pan does not orbit")
+	assert_eq(_zooms.size(), 1, "pan does not zoom")
+
+
+func test_claimed_touches_move_independently_and_do_not_count_for_camera() -> void:
+	for id in [0, 7]:
+		_tracker.handle(_touch(id, Vector2(id * 20, 20), true))
+		_tracker.claim_touch(id)
+	_tracker.handle(_drag(7, Vector2(180, 40)))
+	_tracker.handle(_drag(0, Vector2(15, 40)))
+	assert_eq(_touch_moves, [7, 0], "each grip receives its own moves")
+	assert_true(_orbit.is_empty() and _zooms.is_empty(), "two grips never become a camera gesture")
+	_tracker.handle(_touch(3, Vector2(300, 300), true))
+	_tracker.handle(_drag(3, Vector2(320, 300)))
+	assert_true(_orbit.is_empty(), "one free finger beside grips does not orbit")
+	_tracker.handle(_touch(4, Vector2(400, 300), true))
+	_tracker.handle(_drag(4, Vector2(420, 300)))
+	assert_eq(_orbit, [Vector2(10, 0)], "two free fingers orbit beside two grips")
+
+
+func test_membership_changes_rebase_without_jump_or_repick() -> void:
+	_tracker.handle(_touch(0, Vector2.ZERO, true))
+	_tracker.handle(_touch(1, Vector2(100, 0), true))
+	_tracker.handle(_touch(2, Vector2(900, 900), true))
+	assert_true(_orbit.is_empty() and _pan.is_empty(), "adding fingers never emits a delta")
+	_tracker.handle(_touch(2, Vector2.ZERO, false))
+	_tracker.handle(_drag(1, Vector2(100, 0)))
+	assert_eq(_orbit, [Vector2.ZERO], "three-to-two transition has fresh baseline")
+	_tracker.handle(_touch(1, Vector2.ZERO, false))
+	_tracker.handle(_drag(0, Vector2(30, 0)))
+	assert_eq(_orbit.size(), 1, "remaining finger stays idle")
+	assert_true(_touch_moves.is_empty(), "camera fingers never acquire a grip midway")
+
+
+func test_cancel_release_and_reset_clear_each_capture_once() -> void:
+	for id in [2, 8]:
+		_tracker.handle(_touch(id, Vector2.ONE, true))
+		_tracker.claim_touch(id)
+	var cancel := _touch(2, Vector2.ONE, true)
+	cancel.canceled = true
+	assert_true(_tracker.is_captured_release(cancel), "pressed cancellation is a release")
+	_tracker.handle(cancel)
+	_tracker.handle(cancel)
+	_tracker.handle(_drag(8, Vector2(30, 30)))
+	assert_eq(_touch_moves, [8], "other finger survives cancellation")
+	_tracker.reset()
+	_tracker.reset()
+	assert_eq(_touch_ends, [2, 8], "one end per finger")
+	assert_eq(_tracker.get_pointer_count(), 0, "all capture cleared")
+
+
+func test_four_free_touches_and_degenerate_pinch_are_safe() -> void:
+	_tracker.handle(_touch(0, Vector2.ZERO, true))
+	_tracker.handle(_touch(1, Vector2.ZERO, true))
+	_tracker.handle(_drag(1, Vector2.ONE))
+	assert_true(_zooms.is_empty(), "zero spread cannot divide")
+	_tracker.handle(_touch(2, Vector2(200, 0), true))
+	_tracker.handle(_touch(3, Vector2(300, 0), true))
+	_tracker.handle(_drag(3, Vector2(330, 30)))
+	assert_eq(_orbit.size(), 1, "four free touches do not orbit")
+	assert_true(_pan.is_empty(), "four free touches do not pan")

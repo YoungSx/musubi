@@ -7,6 +7,7 @@ var _hud: Hud
 var _enabled := false
 var play_mode := false
 var _stats_time := 0.0
+var _extra_grip_markers: Dictionary[int, MeshInstance3D] = {}
 var _hint := ""
 var _hover_index := -1
 var _lines := ImmediateMesh.new()
@@ -123,14 +124,16 @@ func _process(delta: float) -> void:
 		_rope.start_anchor.visible = _rope.is_start_attached()
 	if _rope.end_anchor != null:
 		_rope.end_anchor.visible = _rope.is_end_attached()
-	var selected := sim.get_drag_index()
+	var grip_ids := sim.get_grip_ids()
+	var first_grip := grip_ids[0] if not grip_ids.is_empty() else -1
+	var selected := sim.get_drag_index(first_grip)
 	_hud.set_simulation_state(_rope.is_held(), selected >= 0 or _rope.has_support())
 	_support_marker.visible = _rope.has_support() and _enabled
 	if _support_marker.visible:
 		_support_marker.global_position = sim.get_support_position()
 	for hand in 2:
 		var active := selected >= 0 if hand == 0 else _rope.has_support()
-		var point := sim.get_grip_position() if hand == 0 else sim.get_support_position()
+		var point := sim.get_grip_position(first_grip) if hand == 0 else sim.get_support_position()
 		_hand_shadows[hand].visible = play_mode and active and point.y < 0.5
 		if _hand_shadows[hand].visible:
 			_hand_shadows[hand].global_position = Vector3(point.x, 0.003, point.z)
@@ -142,14 +145,14 @@ func _process(delta: float) -> void:
 	_target_line_node.visible = not play_mode or _enabled
 	_target_lines.clear_surfaces()
 	if selected >= 0:
-		_target_marker.global_position = sim.get_drag_target()
+		_target_marker.global_position = sim.get_drag_target(first_grip)
 		_target_lines.surface_begin(Mesh.PRIMITIVE_LINES)
-		_line(_target_lines, sim.get_grip_position(), sim.get_drag_target(), Color("79cbd1"))
+		_line(_target_lines, sim.get_grip_position(first_grip), sim.get_drag_target(first_grip), Color("79cbd1"))
 		_target_lines.surface_end()
 	var marker_index := selected if selected >= 0 else _hover_index
 	_marker.visible = marker_index >= 0 and marker_index < sim.get_point_count()
 	if _marker.visible:
-		_marker.global_position = sim.get_grip_position() if selected >= 0 else sim.get_point(marker_index)
+		_marker.global_position = sim.get_grip_position(first_grip) if selected >= 0 else sim.get_point(marker_index)
 		_marker.scale = Vector3.ONE * (1.0 if selected >= 0 else 0.6)
 		var camera := get_viewport().get_camera_3d()
 		var occluded := false
@@ -158,7 +161,27 @@ func _process(delta: float) -> void:
 		var material := _marker.material_override as StandardMaterial3D
 		material.no_depth_test = occluded
 		material.albedo_color = Color(0.94, 0.79, 0.55, 0.55 if occluded else 1.0)
-	var hint := "Drag rope · Drag space to orbit"
+	for id: int in _extra_grip_markers.keys():
+		if id not in grip_ids or id == first_grip:
+			_extra_grip_markers[id].queue_free()
+			_extra_grip_markers.erase(id)
+	for id: int in grip_ids:
+		if id == first_grip: continue
+		if not _extra_grip_markers.has(id):
+			var marker := _marker.duplicate() as MeshInstance3D
+			marker.material_override = _marker.material_override.duplicate()
+			_marker.get_parent().add_child(marker)
+			_extra_grip_markers[id] = marker
+		var marker := _extra_grip_markers[id]
+		marker.visible = true
+		marker.global_position = sim.get_grip_position(id)
+		marker.scale = Vector3.ONE
+		var camera := get_viewport().get_camera_3d()
+		var occluded := play_mode and camera != null and not RopeVisibility.is_visible(camera.project_ray_origin(camera.unproject_position(marker.global_position)), marker.global_position, _rope.get_collision())
+		var material := marker.material_override as StandardMaterial3D
+		material.no_depth_test = occluded
+		material.albedo_color = Color(0.94, 0.79, 0.55, 0.55 if occluded else 1.0)
+	var hint := "Drag rope · Drag space to orbit" if OS.has_feature("pc") else "Grab with each finger · Two fingers orbit · Three fingers pan"
 	if _rope.is_held():
 		hint = "Shape held · Grab to continue"
 	elif selected >= 0:
@@ -177,7 +200,7 @@ func _process(delta: float) -> void:
 		if i > 0:
 			_line(_lines, sim.get_point(i - 1), point, Color("62bfa4"))
 	if selected >= 0:
-		_line(_lines, sim.get_grip_position(), sim.get_drag_target(), Color.YELLOW)
+		_line(_lines, sim.get_grip_position(first_grip), sim.get_drag_target(first_grip), Color.YELLOW)
 	_lines.surface_end()
 	_stats_time -= delta
 	if _stats_time <= 0.0:

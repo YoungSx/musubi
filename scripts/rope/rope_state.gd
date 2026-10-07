@@ -3,7 +3,7 @@ extends RefCounted
 ## Versioned JSON data only. Scene transforms and collision configuration are
 ## owned by the application and must be reattached after restoring a simulation.
 
-const VERSION := 6
+const VERSION := 7
 const CONFIG_RANGES := {
 	"length": Vector2(0.1, 10.0), "segment_count": Vector2(2, 256),
 	"radius": Vector2(0.002, 0.05), "damping": Vector2(0, 20),
@@ -33,7 +33,7 @@ static func encode(config: RopeConfig, positions: PackedVector3Array, previous: 
 	return {"version": VERSION, "config": parameters, "positions": points,
 		"previous": history, "inverse_mass": Array(masses), "last_substep": last_substep,
 		"drag_index": drag_index, "drag_target": _vector(target), "drag_fraction": drag_fraction,
-		"release_u": release_u, "release_remaining": release_remaining, "support": {}, "transport": []}
+		"release_u": release_u, "release_remaining": release_remaining, "support": {}, "transport": [], "transport_grip_id": -1, "touch_grips": []}
 
 
 ## Validate before allocating a simulation; malformed payloads return empty.
@@ -109,12 +109,31 @@ static func decode(data: Dictionary) -> Dictionary:
 			return {}
 		decoded_support = {"u": float(support.u), "target": _read_vector(support.target)}
 	var transport: Variant = data.get("transport",[] if data.version < 5 else null)
-	if not transport is Array or (not transport.is_empty() and (transport.size() != count or drag < 0)): return {}
+	if not transport is Array or (not transport.is_empty() and transport.size() != count): return {}
 	var decoded_transport := PackedVector3Array()
 	for point in transport:
 		if not _valid_vector(point): return {}
 		decoded_transport.append(_read_vector(point))
+	var touch_grips: Variant = data.get("touch_grips", [] if data.version < 7 else null)
+	if not touch_grips is Array or touch_grips.size() > 32: return {}
+	var decoded_grips: Array[Dictionary] = []
+	var ids := {}
+	for grip: Variant in touch_grips:
+		if not grip is Dictionary or not _number(grip.get("id")) or grip.id < 0 or grip.id != floor(grip.id) or grip.id > 2147483647: return {}
+		if ids.has(int(grip.id)) or not _number(grip.get("u")) or grip.u < 0 or grip.u > 1 or not _valid_vector(grip.get("target")): return {}
+		var coordinate: float = grip.u * (count - 1)
+		var index := floori(coordinate)
+		var t := coordinate - index
+		if masses[index] * (1.0 - t) + masses[mini(index + 1, count - 1)] * t <= 0: return {}
+		if not decoded_support.is_empty() and absf(grip.u - decoded_support.u) * (count - 1) < 2.0: return {}
+		ids[int(grip.id)] = true
+		decoded_grips.append({"id": int(grip.id), "u": float(grip.u), "target": _read_vector(grip.target)})
+	var transport_owner: Variant = data.get("transport_grip_id", -1 if data.version < 7 else null)
+	if not _number(transport_owner) or transport_owner != floor(transport_owner) or transport_owner < -1: return {}
+	if not transport.is_empty() and ((transport_owner == -1 and drag < 0) or (transport_owner >= 0 and not ids.has(int(transport_owner)))): return {}
+	if transport.is_empty() and transport_owner != -1: return {}
 	return {"config": config, "positions": positions, "previous": previous, "support": decoded_support,"transport":decoded_transport,
+		"touch_grips": decoded_grips, "transport_grip_id": int(transport_owner),
 		"inverse_mass": masses, "last_substep": float(data.last_substep),
 		"drag_index": int(drag), "drag_target": _read_vector(data.drag_target), "drag_fraction": float(fraction),
 		"release_u": float(release_u), "release_remaining": float(release_remaining)}

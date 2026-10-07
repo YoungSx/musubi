@@ -8,7 +8,19 @@ in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
 The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: player control during complex manipulation (0.9.1)
+## Current milestone: independent touch grips (0.9.2)
+
+Each finger that starts on visible rope owns an independent soft grip. Other
+fingers control the camera: two drag to orbit and pinch to zoom, three drag to
+pan. A single finger on empty space stays idle. Ownership is fixed until release,
+so camera gestures cannot accidentally grab rope mid-drag. These camera gestures
+also work in the floor session. Releasing one grip preserves the others; camera
+motion preserves each hand's world target. Multi-hand gestures suspend shared
+single-hand assistance until those grips are released.
+
+Portrait input-dispatch replay verifies multiple grips, camera transitions,
+release over UI and stable targets during camera smoothing. This automated
+coverage does not replace physical touchscreen feel/performance acceptance.
 
 Complex torso lacing is now a stress test of control quality, not a net-completion
 target. Surface capture needs sustained evidence, front-side corrections do not
@@ -30,8 +42,8 @@ The default scene retains the full mannequin and its limb/torso collisions.
 An unpinned rope rests naturally across its shoulders. Grab any visible portion
 of the rope, move it and release: physics continues, with a brief local damping
 pulse rather than a frozen scene. Grabs address a continuous location between
-particles. During a grab, a second finger or right mouse drag can inspect the
-scene without dropping the rope or moving the world-space hand target.
+particles. During a grab, two additional fingers on empty space or right mouse
+drag can inspect the scene without dropping the rope or moving its world target.
 
 The default UI has one Menu entry. Rope settings, snapshots, undo/redo and pause
 controls remain available through Advanced; developer targets and endpoint labels
@@ -41,7 +53,7 @@ including intent scoring and clear side passages around mannequin occlusion.
 Verified first-time-player Overhand/Half Hitch play is not implemented yet.
 See [pass assistance and its acceptance limits](docs/pass-assistance.md).
 
-Menu → **Lay rope on ground** starts a fixed-camera floor session in front of the
+Menu → **Lay rope on ground** starts a floor session (fixed camera for mouse input) in front of the
 full mannequin. Left-drag forms loops; a sustained approach into a loop can
 gently lift a local strand and guide the tip underneath. Release removes the
 temporary support and lets the rope settle. No second mouse button or depth
@@ -77,8 +89,8 @@ The capabilities below describe the shared core and advanced workbench:
 - Versioned JSON simulation snapshots preserve configuration, particles,
   velocity history, pins and active grab state for future local save/replay.
 
-Touch: drag the rope to shape it, drag empty space to orbit; two fingers pan
-and pinch to zoom. Mouse: left-drag has the same behavior, right/middle-drag
+Touch: each finger on rope grabs independently; two fingers on empty space orbit
+and pinch to zoom, three pan. Mouse: left-drag grabs rope or orbits empty space, right/middle-drag
 pans, wheel zooms. Grab either dark endpoint to release that attachment;
 release keeps it free, with natural motion in Play and a held shape in Workbench. The wheel moves the grabbed rope
 toward/away from the camera during a drag. Esc restores the complete pre-grab
@@ -141,6 +153,7 @@ godot --path . -s res://tools/verify_tightening.gd -- <output-directory>
 godot --path . -s res://tools/verify_wrap.gd -- <output-directory>
 godot --path . -s res://tools/verify_pass_assist.gd -- <output-directory>
 godot --path . -s res://tools/verify_play_mannequin.gd -- <output-directory>
+godot --path . -s res://tools/verify_multitouch.gd -- <output-directory>
 godot --path . -s res://tools/verify_mouse_ground.gd -- <output-directory>
 godot --path . -s res://tools/verify_control_authority.gd -- <output-directory>
 godot --path . -s res://tools/probe_torso_lattice.gd -- <output-directory>
@@ -154,7 +167,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 156 tests passed. A rendered scene smoke check exercised camera orbit,
+All 161 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.
@@ -172,7 +185,7 @@ the Rope node's held/catch-up state are application data and are not included
 in this simulation snapshot. `MusubiSceneState` adds these fields for full
 creation files, validates before changing the live scene and replaces files
 only after a successful temporary-file write. Invalid files leave the scene intact.
-Simulation format v6 records independent length sweeps; v1–v5 retain their original
+Simulation format v7 records independent touch grips and transport ownership; v6 records independent length sweeps; v1–v5 retain their original
 single-sweep schedule. Version 5 added distributed transport targets to the support,
 fractional-grip and release state. New 6 m shoulder ropes use four length sweeps
 and a firmer soft grip; contacts remain enabled. Existing v1 creations load

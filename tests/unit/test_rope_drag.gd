@@ -53,6 +53,56 @@ func test_release_holds_shape_and_next_grab_resumes() -> void:
 	assert_true(not rope.is_held(), "reset resumes initial simulation")
 
 
+func test_multiple_soft_grips_solve_together_and_round_trip() -> void:
+	var sim := _simulation()
+	assert_true(sim.begin_grip(0.25, 4), "first fractional grip")
+	assert_true(sim.begin_grip(0.75, 9), "second fractional grip")
+	var a := sim.get_grip_position(4)
+	var b := sim.get_grip_position(9)
+	sim.update_drag_target(a + Vector3(0, 0.08, 0.12), 4)
+	sim.update_drag_target(b + Vector3(0, 0.08, -0.12), 9)
+	assert_true(not sim.begin_grip(0.5, 4), "duplicate pointer cannot steal its own grip")
+	for step in 120: sim.step(1.0 / 120.0)
+	assert_true(sim.get_grip_position(4).z > a.z + 0.03, "first grip moves toward its target")
+	assert_true(sim.get_grip_position(9).z < b.z - 0.03, "second grip moves toward its different target")
+	assert_true(sim.get_max_segment_stretch() < 0.08, "multiple hands retain length constraints")
+	var state := sim.capture_state()
+	var restored := RopeSimulation.restore_state(JSON.parse_string(JSON.stringify(state, "", true, true)))
+	assert_true(restored != null, "multiple grips deserialize")
+	if restored == null: return
+	assert_eq(restored.get_grip_ids(), [4, 9], "pointer identities retained")
+	for step in 15:
+		sim.step(1.0 / 120.0)
+		restored.step(1.0 / 120.0)
+	for index in sim.get_point_count():
+		assert_vec3_near(sim.get_point(index), restored.get_point(index), "round-trip continuation is deterministic")
+	sim.release_grip(4)
+	assert_eq(sim.get_grip_ids(), [9], "release removes only one constraint")
+	var target := sim.get_drag_target(9)
+	sim.step(1.0 / 120.0)
+	assert_vec3_near(sim.get_drag_target(9), target, "release leaves other target unchanged")
+	var invalid := state.duplicate(true)
+	invalid.touch_grips[1].id = 4
+	assert_true(RopeSimulation.restore_state(invalid) == null, "duplicate serialized pointer IDs rejected")
+	invalid = state.duplicate(true)
+	invalid.touch_grips[1].target = [0, "bad", 0]
+	assert_true(RopeSimulation.restore_state(invalid) == null, "malformed touch target rejected")
+
+
+func test_touch_transport_ownership_roundtrip_and_release() -> void:
+	var sim := _simulation()
+	sim.begin_grip(0.5, 3)
+	assert_true(sim.set_transport_targets(sim.get_positions(), 3), "single touch retains transport assistance")
+	var restored := RopeSimulation.restore_state(sim.capture_state())
+	assert_true(restored != null and restored.has_transport_targets(), "touch transport owner round-trips")
+	if restored == null: return
+	restored.end_drag(3)
+	assert_true(not restored.has_transport_targets(), "ending owner clears distributed targets")
+	var invalid := sim.capture_state()
+	invalid.transport_grip_id = 8
+	assert_true(RopeSimulation.restore_state(invalid) == null, "missing transport owner rejected")
+
+
 func _simulation() -> RopeSimulation:
 	var config := load("res://data/rope/default_rope.tres") as RopeConfig
 	var a := Vector3(0.55, 1.45, 0.12)
