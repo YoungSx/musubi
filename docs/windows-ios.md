@@ -2,6 +2,17 @@
 
 核查日期：2026-10-07。项目：Godot 4.7.2 / GDScript / Mobile renderer。
 
+## 0.9.3 辅助跟随镜头
+
+- 源码提交 `fcbebcb`，成功构建
+  [37647051603](https://github.com/YoungSx/musubi/actions/runs/37647051603)。
+- Windows 和 macOS CI 均为 `170 passed, 0 failed`；辅助跟随、多指竖屏、
+  自由模式鼠标回放通过。行为与边界见 [辅助镜头说明](assisted-camera.md)。
+- IPA 校验后使用原账户签名覆盖安装成功，手机应用元数据确认 `Musubi` / `0.9.3`。
+- 新场景默认 `Assisted follow`，Menu 的 Camera 部分可切换 `Free camera`；
+  真实触屏手感交由用户试用，本次不将桌面回放报告为手机手势验收。
+- 本地续签脚本已更新到本次产物。
+
 ## 0.9.2 触屏更新
 
 - 源码提交 `e64e0ee`，成功构建
