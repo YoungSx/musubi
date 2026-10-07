@@ -196,9 +196,9 @@ passing controlled passage/reversal cases from the failing free-loop prerequisit
   about 21% in a same-process comparison. Held frames skip mesh updates.
   The renderer recreates its mesh surface when simulation advances; array reuse does not eliminate engine
   or GPU allocations. Mobile performance and memory acceptance remain open.
-- iOS export/signing and physical touch remain unverified. Windows recognizes
-  the USB-connected iPad, but this environment has no detected `xcrun` or
-  libimobiledevice tools. Standard export uses macOS/Xcode; Windows can also
-  use WSL cross-compilation and tools such as xtool. This project's full
-  build/sign/install integration has not been verified. See the researched
-  [Windows iOS build routes and prerequisites](docs/windows-ios.md).
+- Native iPhone IPA compilation now passes on GitHub's macOS runner with
+  Godot 4.7.2 and Xcode 26.3. Local WSL xtool connects to the USB iPhone through
+  Windows Apple device services. Local signing and installation on iPhone 15 Pro
+  / iOS 27.2 are verified. Device logs confirm the app runs and receives touch
+  events; full interaction and mobile performance acceptance remain pending.
+  See [Windows iOS build and installation](docs/windows-ios.md).
