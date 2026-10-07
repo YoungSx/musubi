@@ -8,7 +8,17 @@ in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
 The previous workbench remains available at `scenes/main/main.tscn` (F6).
 No third-party dependencies are required.
 
-## Current milestone: independent touch grips (0.9.2)
+## Current milestone: assisted camera (0.9.3)
+
+New scenes default to **Assisted follow**. Fine movements keep the view stable;
+large drags near the edge and sustained occlusion trigger bounded reframing.
+Multiple grips are framed together. Manual camera gestures take priority, and
+stationary hands or passive rope motion cannot restart following. Menu → Camera
+switches to **Free camera** without releasing the rope. Saved creations remember
+the mode; older files retain free camera behavior. See [camera behavior and
+verification](docs/assisted-camera.md).
+
+The independent touch controls from 0.9.2 remain available:
 
 Each finger that starts on visible rope owns an independent soft grip. Other
 fingers control the camera: two drag to orbit and pinch to zoom, three drag to
@@ -154,6 +164,7 @@ godot --path . -s res://tools/verify_wrap.gd -- <output-directory>
 godot --path . -s res://tools/verify_pass_assist.gd -- <output-directory>
 godot --path . -s res://tools/verify_play_mannequin.gd -- <output-directory>
 godot --path . -s res://tools/verify_multitouch.gd -- <output-directory>
+godot --path . -s res://tools/verify_assisted_follow.gd -- <output-directory>
 godot --path . -s res://tools/verify_mouse_ground.gd -- <output-directory>
 godot --path . -s res://tools/verify_control_authority.gd -- <output-directory>
 godot --path . -s res://tools/probe_torso_lattice.gd -- <output-directory>
@@ -167,7 +178,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 161 tests passed. A rendered scene smoke check exercised camera orbit,
+All 170 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.

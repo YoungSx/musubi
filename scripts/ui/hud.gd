@@ -43,11 +43,15 @@ func _ready() -> void:
 	play_menu.add_item("Save", 1)
 	play_menu.add_item("Open", 2)
 	play_menu.add_item("Lay rope on ground", 5)
+	play_menu.add_separator("Camera")
+	play_menu.add_radio_check_item("Assisted follow", 6)
+	play_menu.add_radio_check_item("Free camera", 7)
+	set_camera_mode(0)
 	play_menu.add_separator()
 	play_menu.add_item("Advanced", 3)
 	if OS.is_debug_build():
 		play_menu.add_item("Debug", 4)
-	play_menu.id_pressed.connect(func(id: int): action_requested.emit(&"ground" if id == 5 else [&"reset", &"save", &"load", &"advanced", &"debug"][id]))
+	play_menu.id_pressed.connect(_play_menu_selected)
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
 		_base_margins[side] = _safe_area.get_theme_constant(side)
 	get_viewport().size_changed.connect(_apply_safe_area)
@@ -57,6 +61,17 @@ func _ready() -> void:
 func set_diagnostics(text: String) -> void:
 	%Diagnostics.text = text
 	%Diagnostics.visible = not text.is_empty()
+
+
+func set_camera_mode(mode: int) -> void:
+	var menu: PopupMenu = %PlayMenu.get_popup()
+	menu.set_item_checked(menu.get_item_index(6), mode == 0)
+	menu.set_item_checked(menu.get_item_index(7), mode == 1)
+
+
+func _play_menu_selected(id: int) -> void:
+	var actions := {0: &"reset", 1: &"save", 2: &"load", 3: &"advanced", 4: &"debug", 5: &"ground", 6: &"camera_assisted", 7: &"camera_free"}
+	if actions.has(id): action_requested.emit(actions[id])
 
 
 func set_interaction_hint(text: String) -> void:

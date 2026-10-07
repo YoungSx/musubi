@@ -10,6 +10,7 @@ extends SceneTree
 const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_gesture_tracker.gd",
 	"res://tests/unit/test_camera_rig.gd",
+	"res://tests/unit/test_follow_camera.gd",
 	"res://tests/unit/test_mannequin.gd",
 	"res://tests/unit/test_rope_simulation.gd",
 	"res://tests/unit/test_rope_renderer.gd",

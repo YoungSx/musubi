@@ -16,6 +16,8 @@ func _run() -> void:
 		return
 	app = load("res://scenes/main/play.tscn").instantiate()
 	root.add_child(app)
+	# Preserve the original free-camera mouse replay; assisted mode has its own replay.
+	app.camera_rig.set_mode(CameraRig.Mode.FREE)
 	ReplayInputGuard.install(self)
 	await _frames(180)
 	_check(app.mannequin.config.parts.size() >= 10, "full articulated mannequin is the play obstacle")

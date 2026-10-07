@@ -15,6 +15,7 @@ signal hover_changed(index: int)
 var _gestures := GestureTracker.new()
 var _rope_interaction := RopeInteraction.new()
 var _touch_grips: Dictionary[int, RopeInteraction] = {}
+var _follow_camera := FollowCameraController.new()
 var _hover_index := -1
 var _hover_time := 0.0
 var _inspecting := false
@@ -42,6 +43,8 @@ func _ready() -> void:
 	_gestures.touch_orbit.connect(func(relative: Vector2): camera_rig.orbit(_to_screen_units(relative)))
 	_gestures.touch_pan.connect(func(relative: Vector2): camera_rig.pan(_to_screen_units(relative)))
 	_gestures.touch_zoom.connect(camera_rig.zoom)
+	camera_rig.manual_input.connect(func(): _follow_camera.manual_override(camera_rig.config.follow_manual_cooldown))
+	camera_rig.view_reset.connect(_follow_camera.reset)
 
 
 func set_play_mode(enabled: bool) -> void:
@@ -87,6 +90,7 @@ func handle_input(event: InputEvent) -> bool:
 func _process(delta: float) -> void:
 	_rope_interaction.tick(delta)
 	for hand: RopeInteraction in _touch_grips.values(): hand.tick(delta)
+	_update_follow_camera(delta)
 	if not OS.has_feature("pc"):
 		return
 	_hover_time -= delta
@@ -105,6 +109,7 @@ func _process(delta: float) -> void:
 
 
 func cancel_drag() -> void:
+	_follow_camera.reset()
 	_rope_interaction.cancel()
 	_gestures.reset()
 
@@ -144,9 +149,24 @@ func _on_touch_ended(id: int) -> void:
 
 
 func reset() -> void:
+	_follow_camera.reset()
 	_gestures.reset()
 	_rope_interaction.end()
 	rope.end_support()
+
+
+func _update_follow_camera(delta: float) -> void:
+	var sim := rope.get_simulation()
+	var grips: Dictionary[int, Vector3] = {}
+	var targets: Dictionary[int, Vector3] = {}
+	var context := PackedVector3Array()
+	for id in sim.get_grip_ids():
+		grips[id] = sim.get_grip_position(id)
+		targets[id] = sim.get_drag_target(id)
+		var index := sim.get_drag_index(id)
+		context.append(sim.get_point(maxi(0, index - 2)))
+		context.append(sim.get_point(mini(sim.get_point_count() - 1, index + 3)))
+	_follow_camera.update(delta, camera_rig, grips, targets, context, rope.get_collision(), _gestures.has_camera_gesture())
 
 
 func _on_primary_started(position: Vector2) -> void:
