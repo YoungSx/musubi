@@ -14,6 +14,7 @@ signal hover_changed(index: int)
 
 var _gestures := GestureTracker.new()
 var _rope_interaction := RopeInteraction.new()
+var _touch_grips: Dictionary[int, RopeInteraction] = {}
 var _hover_index := -1
 var _hover_time := 0.0
 var _inspecting := false
@@ -35,6 +36,12 @@ func _ready() -> void:
 	_gestures.zoom.connect(_on_zoom)
 	_gestures.inspection_started.connect(func(): _inspecting = get_selected_index() >= 0)
 	_gestures.inspection_ended.connect(_on_inspection_ended)
+	_gestures.touch_started.connect(_on_touch_started)
+	_gestures.touch_moved.connect(_on_touch_moved)
+	_gestures.touch_ended.connect(_on_touch_ended)
+	_gestures.touch_orbit.connect(func(relative: Vector2): camera_rig.orbit(_to_screen_units(relative)))
+	_gestures.touch_pan.connect(func(relative: Vector2): camera_rig.pan(_to_screen_units(relative)))
+	_gestures.touch_zoom.connect(camera_rig.zoom)
 
 
 func set_play_mode(enabled: bool) -> void:
@@ -79,6 +86,7 @@ func handle_input(event: InputEvent) -> bool:
 
 func _process(delta: float) -> void:
 	_rope_interaction.tick(delta)
+	for hand: RopeInteraction in _touch_grips.values(): hand.tick(delta)
 	if not OS.has_feature("pc"):
 		return
 	_hover_time -= delta
@@ -102,7 +110,37 @@ func cancel_drag() -> void:
 
 
 func get_selected_index() -> int:
+	if not _touch_grips.is_empty():
+		return _touch_grips.values()[0].get_selected_index()
 	return _rope_interaction.get_selected_index()
+
+
+func get_touch_grip_count() -> int:
+	return _touch_grips.size()
+
+
+func _on_touch_started(id: int, position: Vector2) -> void:
+	var hand := RopeInteraction.new()
+	hand.grip_id = id
+	hand.configure(rope, camera_rig.get_camera())
+	hand.configure_pass_assistance(pass_assist_config)
+	hand.set_pass_assist_enabled(play_enabled)
+	if hand.begin(position):
+		_touch_grips[id] = hand
+		_gestures.claim_touch(id)
+		if rope.get_simulation().get_grip_count() > 1:
+			for active: RopeInteraction in _touch_grips.values(): active.use_multiple_hands()
+			if _rope_interaction.get_selected_index() >= 0: _rope_interaction.use_multiple_hands()
+
+
+func _on_touch_moved(id: int, position: Vector2) -> void:
+	if _touch_grips.has(id): _touch_grips[id].move(position)
+
+
+func _on_touch_ended(id: int) -> void:
+	if _touch_grips.has(id):
+		_touch_grips[id].end()
+		_touch_grips.erase(id)
 
 
 func reset() -> void:

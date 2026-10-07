@@ -1,14 +1,18 @@
 class_name GestureTracker
 extends RefCounted
-## Translates raw touch and mouse events into device-independent gestures.
-##
-##   one pointer moving   -> primary_drag
-##   two pointers moving  -> secondary_drag (centroid motion) + zoom (spread ratio)
-##   mouse                -> left = primary pointer, right/middle drag = secondary,
-##                           wheel = zoom
-##
-## Pure input logic without scene access: unit-testable, and reusable when the
-## InteractionManager starts routing primary drags to the rope.
+## Mouse gestures plus touch ownership: each touch is claimed once at press.
+## Unclaimed touches: two orbit/pinch; three pan; one/four or more do nothing.
+## Adding/removing a finger changes only membership, never emits camera motion.
+
+signal touch_started(id: int, position: Vector2)
+signal touch_moved(id: int, position: Vector2)
+signal touch_ended(id: int)
+signal touch_orbit(relative: Vector2)
+signal touch_pan(relative: Vector2)
+signal touch_zoom(factor: float)
+
+var _touches: Dictionary[int, Vector2] = {}
+var _claimed: Dictionary[int, bool] = {}
 
 signal primary_started(position: Vector2)
 signal primary_drag(position: Vector2, relative: Vector2)
@@ -39,7 +43,7 @@ func handle(event: InputEvent) -> bool:
 		return _handle_touch(event as InputEventScreenTouch)
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
-		return _move_pointer(drag.index, drag.position)
+		return _move_touch(drag.index, drag.position)
 	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
 		return false # Mouse events synthesized from touch; already handled as touch.
 	if event is InputEventMouseButton:
@@ -53,19 +57,21 @@ func handle(event: InputEvent) -> bool:
 
 
 func reset() -> void:
+	for id: int in _touches.keys():
+		_release_touch(id)
 	_cancel_primary()
 	_pointers.clear()
 	_mouse_secondary_held = false
 
 
 func get_pointer_count() -> int:
-	return _pointers.size()
+	return _pointers.size() + _touches.size()
 
 
 ## Releases must be observed before UI handling, even outside the scene area.
 func is_captured_release(event: InputEvent) -> bool:
 	if event is InputEventScreenTouch:
-		return (not event.pressed or event.canceled) and _pointers.has(event.index)
+		return (not event.pressed or event.canceled) and _touches.has(event.index)
 	if event is InputEventMouseButton and event.device != InputEvent.DEVICE_ID_EMULATION and not event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			return _pointers.has(MOUSE_POINTER)
@@ -75,22 +81,61 @@ func is_captured_release(event: InputEvent) -> bool:
 
 func is_captured_motion(event: InputEvent) -> bool:
 	if event is InputEventScreenDrag:
-		return _pointers.has(event.index)
+		return _touches.has(event.index)
 	if event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION:
 		return _pointers.has(MOUSE_POINTER) or _mouse_secondary_held
 	return false
 
 
+func claim_touch(id: int) -> void:
+	if _touches.has(id):
+		_claimed[id] = true
+
+
 func _handle_touch(event: InputEventScreenTouch) -> bool:
-	if event.canceled:
-		if not _pointers.has(event.index):
-			return false
-		_cancel_primary()
-		_pointers.erase(event.index)
+	if event.canceled or not event.pressed:
+		return _release_touch(event.index)
+	if not _touches.has(event.index):
+		_touches[event.index] = event.position
+		touch_started.emit(event.index, event.position)
+	return true
+
+
+func _release_touch(id: int) -> bool:
+	if not _touches.erase(id): return false
+	_claimed.erase(id)
+	touch_ended.emit(id)
+	return true
+
+
+func _camera_points() -> Array[Vector2]:
+	var points: Array[Vector2] = []
+	for id: int in _touches:
+		if not _claimed.has(id): points.append(_touches[id])
+	return points
+
+
+func _move_touch(id: int, position: Vector2) -> bool:
+	if not _touches.has(id): return false
+	var before := _camera_points()
+	_touches[id] = position
+	if _claimed.has(id):
+		touch_moved.emit(id, position)
 		return true
-	if event.pressed:
-		return _press_pointer(event.index, event.position)
-	return _release_pointer(event.index)
+	var after := _camera_points()
+	if after.size() not in [2, 3]: return true
+	var relative := Vector2.ZERO
+	for i in after.size(): relative += after[i] - before[i]
+	relative /= float(after.size())
+	if after.size() == 3:
+		touch_pan.emit(relative)
+	else:
+		touch_orbit.emit(relative)
+		var spread := before[0].distance_to(before[1])
+		if spread >= MIN_PINCH_SPREAD:
+			var factor := after[0].distance_to(after[1]) / spread
+			if is_finite(factor) and factor > 0.0: touch_zoom.emit(factor)
+	return true
 
 
 func _handle_mouse_button(event: InputEventMouseButton) -> bool:
@@ -140,9 +185,6 @@ func _press_pointer(index: int, position: Vector2) -> bool:
 		_primary_active = true
 		_primary_id = index
 		primary_started.emit(position)
-	elif preserve_grip_during_inspection and _primary_active and _pointers.size() == 2:
-		_inspecting = true
-		inspection_started.emit()
 	else:
 		_cancel_primary()
 	return true
@@ -175,31 +217,8 @@ func _move_pointer(index: int, position: Vector2) -> bool:
 	if not _pointers.has(index):
 		return false
 
-	if _pointers.size() == 2:
-		var centroid_before := _centroid()
-		var spread_before := _spread()
-		_pointers[index] = position
-		secondary_drag.emit(_centroid() - centroid_before)
-		if spread_before >= MIN_PINCH_SPREAD:
-			zoom.emit(_spread() / spread_before)
-		return true
-
 	var previous: Vector2 = _pointers[index]
 	_pointers[index] = position
 	if _pointers.size() == 1:
 		primary_drag.emit(position, position - previous)
 	return true
-
-
-func _centroid() -> Vector2:
-	var sum := Vector2.ZERO
-	for point: Vector2 in _pointers.values():
-		sum += point
-	return sum / float(_pointers.size())
-
-
-func _spread() -> float:
-	var points := _pointers.values()
-	var a: Vector2 = points[0]
-	var b: Vector2 = points[1]
-	return a.distance_to(b)

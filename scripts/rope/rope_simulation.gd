@@ -29,6 +29,16 @@ var _support_target := Vector3.ZERO
 var _support_lambda := Vector3.ZERO
 var _transport_targets := PackedVector3Array()
 var _transport_lambdas := PackedVector3Array()
+var _transport_grip_id := -1
+
+## Mouse/legacy grip uses -1; touch grips retain their physical pointer IDs.
+class TouchGrip:
+	var index: int
+	var fraction: float
+	var target: Vector3
+	var multiplier := Vector3.ZERO
+
+var _touch_grips: Dictionary[int, TouchGrip] = {}
 
 
 func _init(config: RopeConfig, initial_positions: PackedVector3Array) -> void:
@@ -57,6 +67,8 @@ func step(dt: float) -> void:
 		_release_remaining = maxf(0.0, _release_remaining - h)
 		_lambdas.fill(0.0)
 		_drag_lambda = Vector3.ZERO
+		for grip: TouchGrip in _touch_grips.values():
+			grip.multiplier = Vector3.ZERO
 		_support_lambda = Vector3.ZERO
 		_transport_lambdas.fill(Vector3.ZERO)
 		for iteration in _config.solver_iterations:
@@ -91,7 +103,12 @@ func capture_state() -> Dictionary:
 		_last_substep, _drag_index, _drag_target, _drag_fraction, _release_u, _release_remaining)
 	data.support = {"u": get_support_u(), "target": [_support_target.x, _support_target.y, _support_target.z]} if _support_index >= 0 else {}
 	data.transport = []
+	data.transport_grip_id = _transport_grip_id
 	for point in _transport_targets: data.transport.append([point.x,point.y,point.z])
+	data.touch_grips = []
+	for id: int in _touch_grips:
+		var grip := _touch_grips[id]
+		data.touch_grips.append({"id": id, "u": get_grip_u(id), "target": [grip.target.x, grip.target.y, grip.target.z]})
 	return data
 
 
@@ -108,10 +125,13 @@ static func restore_state(data: Dictionary) -> RopeSimulation:
 	simulation._drag_fraction = state.drag_fraction
 	simulation._release_u = state.release_u
 	simulation._release_remaining = state.release_remaining
-	simulation.set_transport_targets(state.transport)
 	if not state.support.is_empty():
 		simulation.begin_support(state.support.u)
 		simulation._support_target = state.support.target
+	for grip: Dictionary in state.touch_grips:
+		simulation.begin_grip(grip.u, grip.id)
+		simulation._touch_grips[grip.id].target = grip.target
+	simulation.set_transport_targets(state.transport, state.transport_grip_id)
 	return simulation
 
 
@@ -121,7 +141,9 @@ func begin_drag(index: int) -> bool:
 	return begin_grip(float(index) / float(_positions.size() - 1))
 
 
-func begin_grip(material_u: float) -> bool:
+func begin_grip(material_u: float, grip_id := -1) -> bool:
+	if grip_id < -1 or grip_id > 2147483647 or (grip_id >= 0 and (_touch_grips.has(grip_id) or _touch_grips.size() >= 32)):
+		return false
 	if not is_finite(material_u) or material_u < 0.0 or material_u > 1.0:
 		return false
 	var coordinate := material_u * float(_positions.size() - 1)
@@ -132,6 +154,14 @@ func begin_grip(material_u: float) -> bool:
 	var other := mini(index + 1, _positions.size() - 1)
 	if _inverse_mass[index] * (1.0 - fraction) + _inverse_mass[other] * fraction <= 0.0:
 		return false
+	if grip_id >= 0:
+		var grip := TouchGrip.new()
+		grip.index = index
+		grip.fraction = fraction
+		grip.target = _positions[index].lerp(_positions[other], fraction)
+		_touch_grips[grip_id] = grip
+		_release_remaining = 0.0
+		return true
 	_drag_index = index
 	_drag_fraction = fraction
 	_drag_target = get_grip_position()
@@ -140,21 +170,41 @@ func begin_grip(material_u: float) -> bool:
 	return true
 
 
-func get_grip_position() -> Vector3:
+func get_grip_position(grip_id := -1) -> Vector3:
+	if grip_id >= 0:
+		if not _touch_grips.has(grip_id): return Vector3.ZERO
+		var grip := _touch_grips[grip_id]
+		return _positions[grip.index].lerp(_positions[mini(grip.index + 1, _positions.size() - 1)], grip.fraction)
 	if _drag_index < 0:
 		return Vector3.ZERO
 	return _positions[_drag_index].lerp(_positions[mini(_drag_index + 1, _positions.size() - 1)], _drag_fraction)
 
 
-func get_grip_u() -> float:
+func get_grip_u(grip_id := -1) -> float:
+	if grip_id >= 0:
+		if not _touch_grips.has(grip_id): return -1.0
+		var grip := _touch_grips[grip_id]
+		return (float(grip.index) + grip.fraction) / float(_positions.size() - 1)
 	return (float(_drag_index) + _drag_fraction) / float(_positions.size() - 1) if _drag_index >= 0 else -1.0
+
+
+func get_grip_ids() -> Array[int]:
+	var ids: Array[int] = []
+	if _drag_index >= 0: ids.append(-1)
+	ids.append_array(_touch_grips.keys())
+	return ids
+
+
+func get_grip_count() -> int:
+	return _touch_grips.size() + (1 if _drag_index >= 0 else 0)
 
 
 func begin_support(u: float) -> bool:
 	if _support_index >= 0 or not is_finite(u) or u < 0 or u > 1:
 		return false
-	if _drag_index >= 0 and absf(u - get_grip_u()) * (_positions.size() - 1) < 2.0:
-		return false
+	for id in get_grip_ids():
+		if absf(u - get_grip_u(id)) * (_positions.size() - 1) < 2.0:
+			return false
 	var coordinate := u * (_positions.size() - 1)
 	if absf(coordinate - roundf(coordinate)) < 1e-8:
 		coordinate = roundf(coordinate)
@@ -189,31 +239,44 @@ func release_support() -> void:
 	_support_lambda = Vector3.ZERO
 
 
-func update_drag_target(target: Vector3) -> void:
-	if _drag_index < 0 or not target.is_finite():
+func update_drag_target(target: Vector3, grip_id := -1) -> void:
+	var index := get_drag_index(grip_id)
+	if index < 0 or not target.is_finite():
 		return
+	var fraction := _drag_fraction if grip_id < 0 else _touch_grips[grip_id].fraction
 	# Intersect reachable spheres around attachments; extra path around the
 	# mannequin is still handled by the soft constraint rather than stretching.
 	for pass_index in 8:
 		for i in _positions.size():
 			if is_pinned(i):
-				var reach := absf(float(i - _drag_index) - _drag_fraction) * _config.get_rest_length()
+				var reach := absf(float(i - index) - fraction) * _config.get_rest_length()
 				target = _positions[i] + (target - _positions[i]).limit_length(reach)
-	_drag_target = target
+	if grip_id < 0:
+		_drag_target = target
+	else:
+		_touch_grips[grip_id].target = target
 
 
-func end_drag() -> void:
-	set_transport_targets(PackedVector3Array())
+func end_drag(grip_id := -1) -> void:
+	if _transport_grip_id == grip_id:
+		set_transport_targets(PackedVector3Array())
+	if grip_id >= 0:
+		_touch_grips.erase(grip_id)
+		return
 	_drag_index = -1
 	_drag_fraction = 0.0
 	_drag_lambda = Vector3.ZERO
 
 
-func get_drag_index() -> int:
+func get_drag_index(grip_id := -1) -> int:
+	if grip_id >= 0:
+		return _touch_grips[grip_id].index if _touch_grips.has(grip_id) else -1
 	return _drag_index
 
 
-func get_drag_target() -> Vector3:
+func get_drag_target(grip_id := -1) -> Vector3:
+	if grip_id >= 0:
+		return _touch_grips[grip_id].target if _touch_grips.has(grip_id) else Vector3.ZERO
 	return _drag_target
 
 
@@ -225,7 +288,13 @@ func stop_motion() -> void:
 
 ## Natural release: only the gripped neighborhood gets a brief damping pulse.
 ## Distant particles keep moving; collision and length constraints remain active.
-func release_grip() -> void:
+func release_grip(grip_id := -1) -> void:
+	if grip_id >= 0:
+		if _touch_grips.has(grip_id):
+			var grip := _touch_grips[grip_id]
+			_stabilize_release(grip.index, grip.fraction)
+			end_drag(grip_id)
+		return
 	if _drag_index < 0:
 		return
 	_stabilize_release(_drag_index, _drag_fraction)
@@ -247,12 +316,15 @@ func _solve_drag(dt: float) -> void:
 		_support_lambda = _solve_grip(_support_index, _support_fraction, _support_target, _support_lambda, dt)
 	if _drag_index >= 0:
 		_drag_lambda = _solve_grip(_drag_index, _drag_fraction, _drag_target, _drag_lambda, dt)
+	for grip: TouchGrip in _touch_grips.values():
+		grip.multiplier = _solve_grip(grip.index, grip.fraction, grip.target, grip.multiplier, dt)
 
-func set_transport_targets(targets: PackedVector3Array) -> bool:
-	if not targets.is_empty() and (targets.size() != _positions.size() or _drag_index < 0): return false
+func set_transport_targets(targets: PackedVector3Array, grip_id := -1) -> bool:
+	if not targets.is_empty() and (targets.size() != _positions.size() or get_drag_index(grip_id) < 0): return false
 	for target in targets:
 		if not target.is_finite(): return false
 	_transport_targets = targets.duplicate()
+	_transport_grip_id = grip_id if not targets.is_empty() else -1
 	_transport_lambdas.resize(targets.size())
 	return true
 

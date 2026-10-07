@@ -108,7 +108,7 @@ func get_collision() -> RopeCollision:
 
 func new_rope(length_m: float) -> bool:
 	var preset := RopeConfig.for_length(length_m)
-	if preset == null or _simulation.get_drag_index() >= 0:
+	if preset == null or _simulation.get_grip_count() > 0:
 		return false
 	config = preset
 	if initial_layout == InitialLayout.DRAPED:
@@ -123,7 +123,7 @@ func new_rope(length_m: float) -> bool:
 
 
 func set_endpoint_attached(side: int, attached: bool) -> bool:
-	if side not in [0, 1] or _simulation.get_drag_index() >= 0:
+	if side not in [0, 1] or _simulation.get_grip_count() > 0:
 		return false
 	var anchor := start_anchor if side == 0 else end_anchor
 	if anchor == null:
@@ -151,8 +151,10 @@ func begin_drag(index: int) -> bool:
 	return begin_grip(float(index) / float(_simulation.get_point_count() - 1))
 
 
-func begin_grip(material_u: float) -> bool:
-	if _simulation.get_drag_index() >= 0 or not is_finite(material_u) or material_u < 0 or material_u > 1:
+func begin_grip(material_u: float, grip_id := -1) -> bool:
+	if grip_id < -1 or grip_id > 2147483647:
+		return false
+	if _simulation.get_drag_index(grip_id) >= 0 or not is_finite(material_u) or material_u < 0 or material_u > 1:
 		return false
 	if has_support() and absf(material_u - _simulation.get_support_u()) * config.segment_count < 2.0:
 		return false
@@ -163,7 +165,7 @@ func begin_grip(material_u: float) -> bool:
 	if material_u == 1.0 and _end_attached:
 		_end_attached = false
 		_simulation.unpin(_simulation.get_point_count() - 1)
-	if not _simulation.begin_grip(material_u):
+	if not _simulation.begin_grip(material_u, grip_id):
 		return false
 	if _drag_snapshot.is_empty():
 		_drag_snapshot = before
@@ -172,18 +174,19 @@ func begin_grip(material_u: float) -> bool:
 	return true
 
 
-func update_drag_target(target: Vector3) -> void:
-	_simulation.update_drag_target(target)
+func update_drag_target(target: Vector3, grip_id := -1) -> void:
+	_simulation.update_drag_target(target, grip_id)
 
 
-func end_drag() -> void:
-	if _simulation.get_drag_index() < 0:
+func end_drag(grip_id := -1) -> void:
+	if _simulation.get_drag_index(grip_id) < 0:
 		return
 	if hold_on_release:
-		_simulation.end_drag()
-		_simulation.stop_motion()
+		_simulation.end_drag(grip_id)
+		if _simulation.get_grip_count() == 0:
+			_simulation.stop_motion()
 	else:
-		_simulation.release_grip()
+		_simulation.release_grip(grip_id)
 	_finish_hand_edit()
 
 
@@ -210,7 +213,7 @@ func end_support() -> void:
 
 
 func _finish_hand_edit() -> void:
-	if has_support() or _simulation.get_drag_index() >= 0:
+	if has_support() or _simulation.get_grip_count() > 0:
 		return
 	var before := _drag_snapshot.duplicate(true)
 	_drag_snapshot.clear()
@@ -254,7 +257,7 @@ func is_end_attached() -> bool:
 ## Scene snapshots deliberately reject active gestures; a saved scene cannot
 ## recreate a physical pointer or its pre-grab cancellation history.
 func capture_scene_state() -> Dictionary:
-	if _simulation.get_drag_index() >= 0 or has_support():
+	if _simulation.get_grip_count() > 0 or has_support():
 		return {}
 	return {"simulation": _simulation.capture_state(), "held": _held,
 		"initial_layout": int(initial_layout), "hold_on_release": hold_on_release,
@@ -276,7 +279,7 @@ func validate_scene_state(data: Dictionary) -> bool:
 	if not (accumulator is float or accumulator is int) or not is_finite(float(accumulator)):
 		return false
 	var state := RopeState.decode(data.simulation)
-	if state.is_empty() or state.drag_index != -1 or not state.support.is_empty() or not state.config.is_scene_supported():
+	if state.is_empty() or state.drag_index != -1 or not state.touch_grips.is_empty() or not state.support.is_empty() or not state.config.is_scene_supported():
 		return false
 	if accumulator < 0.0 or accumulator > state.config.get_time_step() + 1e-9 or (data.held and accumulator != 0.0):
 		return false

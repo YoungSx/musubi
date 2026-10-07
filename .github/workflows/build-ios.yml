@@ -7,6 +7,11 @@ on:
     paths:
       - .github/workflows/build-ios.yml
       - export_presets.cfg
+      - project.godot
+      - scripts/**
+      - scenes/**
+      - assets/**
+      - data/**
 
 permissions:
   contents: read
@@ -49,6 +54,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/ios
           Godot --headless --path . --editor --import
+          Godot --headless --path . -s res://tests/run_tests.gd
           Godot --headless --path . --export-release iOS build/ios/Musubi.xcodeproj
       - name: Compile unsigned iPhone app
         run: |

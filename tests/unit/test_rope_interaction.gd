@@ -25,7 +25,7 @@ func test_visible_segment_grab_has_no_jump_and_moves_target_only() -> void:
 	assert_true(_rope.get_simulation().get_drag_target().x > point.x, "screen motion updates world target")
 	assert_vec3_near(_rope.get_simulation().get_point(2), point, "input itself does not change particle positions")
 	interaction.end()
-	assert_eq(_rope.get_simulation().get_drag_index(), -1, "end removes temporary constraint")
+	assert_eq(_rope.get_simulation().get_grip_count(), 0, "end removes temporary constraint")
 
 
 func test_endpoints_can_be_picked_but_hidden_rope_cannot() -> void:
@@ -61,6 +61,7 @@ func test_hit_routes_to_rope_and_miss_stays_camera_until_release() -> void:
 	assert_near(_rig.get_target_yaw(), yaw, "rope movement leaves camera alone")
 	_manager.handle_input(_touch(0, _screen(2), false))
 	_manager.handle_input(_touch(1, Vector2(10, 10), true))
+	_manager.handle_input(_touch(2, Vector2(100, 10), true))
 	_manager.handle_input(_drag(1, _screen(2)))
 	assert_eq(_manager.get_selected_index(), -1, "camera gesture cannot acquire rope midway")
 	assert_true(not is_equal_approx(_rig.get_target_yaw(), yaw), "empty-space gesture rotates camera")
@@ -74,23 +75,72 @@ func test_release_before_ui_handling_clears_drag() -> void:
 	# UI may consume the release, so unhandled_input will never be called.
 	_manager._input(_touch(0, Vector2(195, 790), false))
 	assert_eq(_manager.get_selected_index(), -1, "pre-UI release clears selection")
-	assert_eq(_rope.get_simulation().get_drag_index(), -1, "pre-UI release removes constraint")
+	assert_eq(_rope.get_simulation().get_grip_count(), 0, "pre-UI release removes constraint")
 
 
-func test_second_finger_cancels_drag_and_remaining_finger_cannot_repick() -> void:
+func test_each_touch_grabs_and_releases_independently() -> void:
 	_setup()
-	_manager.handle_input(_touch(0, _screen(2), true))
-	_manager.handle_input(_touch(1, _screen(2) + Vector2(100, 0), true))
-	assert_eq(_manager.get_selected_index(), -1, "second finger releases rope")
-	var distance := _rig.get_target_distance()
-	_manager.handle_input(_drag(1, _screen(2) + Vector2(130, 0)))
-	assert_true(_rig.get_target_distance() < distance, "two-finger pinch zooms")
-	_manager.handle_input(_touch(1, _screen(2), false))
+	_rope.config.length = 1.4
+	_rope.reset()
+	var first := _screen(1)
+	var second := _screen(3)
+	_manager.handle_input(_touch(0, first, true))
+	_manager.handle_input(_touch(6, second, true))
+	var sim := _rope.get_simulation()
+	assert_eq(sim.get_grip_count(), 2, "two simultaneous solver grips")
+	var first_target := sim.get_drag_target(0)
+	var second_target := sim.get_drag_target(6)
 	var yaw := _rig.get_target_yaw()
-	_manager.handle_input(_drag(0, _screen(2) + Vector2(10, 0)))
-	assert_eq(_manager.get_selected_index(), -1, "remaining finger remains camera-only")
-	assert_true(not is_equal_approx(_rig.get_target_yaw(), yaw), "remaining finger orbits")
+	_manager.handle_input(_drag(0, first + Vector2(0, 25)))
+	assert_true(sim.get_drag_target(0).distance_to(first_target) > 0.01, "first hand moves")
+	assert_vec3_near(sim.get_drag_target(6), second_target, "second target is independent")
+	_manager.handle_input(_drag(6, second + Vector2(0, -25)))
+	assert_true(sim.get_drag_target(6).distance_to(second_target) > 0.01, "second hand moves")
+	assert_near(_rig.get_target_yaw(), yaw, "grips do not rotate camera")
+	_manager._input(_touch(0, Vector2(195, 790), false))
+	assert_eq(sim.get_grip_count(), 1, "release over UI only releases that finger")
+	assert_true(not _rope.is_held(), "remaining grip keeps simulation running")
+	assert_true(_rope.capture_scene_state().is_empty(), "active second grip blocks saving")
+	_manager.handle_input(_touch(6, second, false))
+	assert_eq(sim.get_grip_count(), 0, "last release ends gesture")
+	assert_true(_rope.is_held(), "workbench holds only after last release")
+
+
+func test_floor_camera_uses_two_free_fingers_to_orbit_three_to_pan() -> void:
+	_setup()
+	_rope.initial_layout = Rope.InitialLayout.FLOOR
+	_manager.set_play_mode(true)
+	var yaw := _rig.get_target_yaw()
+	var focus := _rig.get_target_focus()
+	_manager.handle_input(_touch(0, Vector2(20, 20), true))
+	_manager.handle_input(_touch(1, Vector2(120, 20), true))
+	_manager.handle_input(_drag(1, Vector2(140, 30)))
+	assert_true(_rig.get_target_yaw() != yaw, "floor scene can orbit")
+	assert_vec3_near(_rig.get_target_focus(), focus, "two fingers never pan")
+	yaw = _rig.get_target_yaw()
+	var distance := _rig.get_target_distance()
+	_manager.handle_input(_touch(2, Vector2(200, 20), true))
+	_manager.handle_input(_drag(2, Vector2(230, 50)))
+	assert_true(_rig.get_target_focus().distance_to(focus) > 0.001, "three fingers pan")
+	assert_near(_rig.get_target_yaw(), yaw, "three fingers never orbit")
+	assert_near(_rig.get_target_distance(), distance, "three fingers never pinch")
 	_manager.reset()
+
+
+func test_multi_grip_cancel_restores_one_transaction_and_focus_loss_releases_all() -> void:
+	_setup()
+	var before := _rope.capture_scene_state()
+	_manager.handle_input(_touch(3, _screen(0), true))
+	_manager.handle_input(_touch(8, _screen(4), true))
+	assert_true(not _rope.is_start_attached() and not _rope.is_end_attached(), "both endpoints detach")
+	_manager.cancel_drag()
+	assert_eq(_rope.capture_scene_state(), before, "cancel restores whole gesture including both attachments")
+	assert_eq(_manager.get_touch_grip_count(), 0, "cancel clears owners")
+	_manager.handle_input(_touch(3, _screen(0), true))
+	_manager.handle_input(_touch(8, _screen(4), true))
+	_manager.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
+	assert_eq(_rope.get_simulation().get_grip_count(), 0, "focus loss removes every constraint")
+	assert_eq(_manager.get_touch_grip_count(), 0, "focus loss removes every owner")
 
 
 func test_canceled_touch_focus_loss_and_reset_clear_constraints() -> void:
@@ -99,14 +149,14 @@ func test_canceled_touch_focus_loss_and_reset_clear_constraints() -> void:
 	var cancel := _touch(0, _screen(2), false)
 	cancel.canceled = true
 	_manager._input(cancel)
-	assert_eq(_rope.get_simulation().get_drag_index(), -1, "cancel clears drag")
+	assert_eq(_rope.get_simulation().get_grip_count(), 0, "cancel clears drag")
 	_manager.handle_input(_touch(1, _screen(2), true))
 	_manager.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
 	assert_eq(_manager.get_selected_index(), -1, "focus loss clears selection")
-	assert_eq(_rope.get_simulation().get_drag_index(), -1, "focus loss clears constraint")
+	assert_eq(_rope.get_simulation().get_grip_count(), 0, "focus loss clears constraint")
 	_manager.handle_input(_touch(2, _screen(2), true))
 	_manager.reset()
-	assert_eq(_rope.get_simulation().get_drag_index(), -1, "reset clears constraint")
+	assert_eq(_rope.get_simulation().get_grip_count(), 0, "reset clears constraint")
 
 
 func _setup() -> void:
