@@ -68,6 +68,10 @@ func get_pointer_count() -> int:
 	return _pointers.size() + _touches.size()
 
 
+func has_camera_gesture() -> bool:
+	return _mouse_secondary_held or _touches.size() - _claimed.size() >= 2
+
+
 ## Releases must be observed before UI handling, even outside the scene area.
 func is_captured_release(event: InputEvent) -> bool:
 	if event is InputEventScreenTouch:

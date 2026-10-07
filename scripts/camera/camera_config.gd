@@ -22,3 +22,13 @@ extends Resource
 ## Exponential easing rate toward the requested view. Higher is snappier.
 @export_range(1.0, 60.0, 0.1) var smoothing: float = 14.0
 @export_range(10.0, 120.0, 0.1, "degrees") var fov: float = 40.0
+
+@export_group("Assisted follow")
+## Normalized screen region reserved for precise manipulation without reframing.
+@export var follow_safe_region := Rect2(0.20, 0.20, 0.60, 0.60)
+@export var follow_focus_speed := 0.9
+@export var follow_distance_speed := 1.2
+@export var follow_turn_speed_degrees := 35.0
+@export var follow_occlusion_delay := 0.25
+@export var follow_settle_time := 0.45
+@export var follow_manual_cooldown := 0.35

@@ -23,6 +23,8 @@ func _ready() -> void:
 	rope_debug.configure(rope, mannequin, hud)
 	hud.debug_toggled.connect(rope_debug.set_debug_enabled)
 	hud.action_requested.connect(handle_action)
+	camera_rig.mode_changed.connect(hud.set_camera_mode)
+	hud.set_camera_mode(camera_rig.mode)
 	hud.save_requested.connect(save_creation)
 	hud.load_requested.connect(load_creation)
 	hud.new_rope_requested.connect(new_rope)
@@ -36,6 +38,9 @@ func _ready() -> void:
 
 func handle_action(action: StringName) -> void:
 	match action:
+		&"camera_assisted", &"camera_free":
+			camera_rig.set_mode(CameraRig.Mode.ASSISTED if action == &"camera_assisted" else CameraRig.Mode.FREE)
+			hud.set_status("Camera: Assisted follow" if camera_rig.mode == CameraRig.Mode.ASSISTED else "Camera: Free")
 		&"ground":
 			interaction_manager.reset()
 			var before := rope.capture_scene_state()

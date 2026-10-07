@@ -7,6 +7,11 @@ extends Node3D
 ## view toward the requested target view every frame.
 
 @export var config: CameraConfig
+enum Mode { ASSISTED, FREE }
+var mode: Mode = Mode.ASSISTED
+signal mode_changed(value: int)
+signal manual_input
+signal view_reset
 
 var _target := OrbitState.new()
 var _current := OrbitState.new()
@@ -37,6 +42,8 @@ func _process(delta: float) -> void:
 
 
 func orbit(screen_delta: Vector2) -> void:
+	if screen_delta.is_zero_approx(): return
+	manual_input.emit()
 	var radians_per_screen := deg_to_rad(config.orbit_degrees_per_screen)
 	_target.yaw -= screen_delta.x * radians_per_screen
 	_target.pitch = clampf(
@@ -48,12 +55,15 @@ func orbit(screen_delta: Vector2) -> void:
 
 ## factor > 1 moves closer (pinch out), factor < 1 moves away.
 func zoom(factor: float) -> void:
-	if factor <= 0.0:
+	if not is_finite(factor) or factor <= 0.0 or is_equal_approx(factor, 1.0):
 		return
+	manual_input.emit()
 	_target.distance = clampf(_target.distance / factor, config.min_distance, config.max_distance)
 
 
 func pan(screen_delta: Vector2) -> void:
+	if screen_delta.is_zero_approx(): return
+	manual_input.emit()
 	var view_basis := orbit_basis(_target.yaw, _target.pitch)
 	var world_per_screen := config.pan_per_screen * _target.distance
 	var offset := (view_basis.y * screen_delta.y - view_basis.x * screen_delta.x) * world_per_screen
@@ -63,6 +73,7 @@ func pan(screen_delta: Vector2) -> void:
 
 ## Snaps immediately to the configured default view.
 func reset_view() -> void:
+	view_reset.emit()
 	_target.yaw = deg_to_rad(config.yaw_degrees)
 	_target.pitch = deg_to_rad(config.pitch_degrees)
 	_target.distance = config.distance
@@ -76,10 +87,12 @@ func get_camera() -> Camera3D:
 
 
 func turn_around() -> void:
+	manual_input.emit()
 	_target.yaw += PI
 
 
 func frame_ground(rope_length := 2.2) -> void:
+	view_reset.emit()
 	var extra := maxf(0,rope_length-2.2)
 	_target.focus = Vector3(0, 0.55+extra*0.1, 0.3+extra*0.25)
 	_target.yaw = deg_to_rad(config.yaw_degrees)
@@ -105,14 +118,35 @@ func get_target_focus() -> Vector3:
 	return _target.focus
 
 
+func set_mode(value: Mode) -> void:
+	if mode == value: return
+	mode = value
+	mode_changed.emit(mode)
+	view_reset.emit()
+
+
+func get_target_transform() -> Transform3D:
+	return global_transform * compute_camera_transform(_target.yaw, _target.pitch, _target.distance, _target.focus)
+
+
+## Only the policy calls this: automatic motion must not masquerade as input.
+func apply_assisted_view(focus: Vector3, distance: float, yaw: float) -> void:
+	if mode != Mode.ASSISTED or not focus.is_finite() or not is_finite(distance) or not is_finite(yaw): return
+	_target.focus = config.focus + (focus - config.focus).limit_length(config.max_focus_offset)
+	_target.distance = clampf(distance, config.min_distance, config.max_distance)
+	_target.yaw += wrapf(yaw - _target.yaw, -PI, PI)
+
+
 ## Stores both sides of the easing operation so loading does not jump views.
 func capture_state() -> Dictionary:
-	return {"config_path": config.resource_path, "current": _encode_orbit(_current), "target": _encode_orbit(_target)}
+	return {"config_path": config.resource_path, "mode": int(mode), "current": _encode_orbit(_current), "target": _encode_orbit(_target)}
 
 
 func validate_state(data: Dictionary) -> bool:
 	if config == null or data.get("config_path") != config.resource_path:
 		return false
+	var saved_mode: Variant = data.get("mode", int(Mode.FREE))
+	if not _finite_number(saved_mode) or saved_mode < Mode.ASSISTED or saved_mode > Mode.FREE or saved_mode != floor(saved_mode): return false
 	for key in ["current", "target"]:
 		var view: Variant = data.get(key)
 		if not view is Dictionary:
@@ -141,6 +175,8 @@ func restore_state(data: Dictionary) -> bool:
 		return false
 	_decode_orbit(data.current, _current)
 	_decode_orbit(data.target, _target)
+	set_mode(int(data.get("mode", Mode.FREE)) as Mode)
+	view_reset.emit()
 	_apply_current()
 	return true
 
