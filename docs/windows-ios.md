@@ -2,6 +2,20 @@
 
 核查日期：2026-10-07。项目：Godot 4.7.2 / GDScript / Mobile renderer。
 
+## 0.9.2 触屏更新
+
+- 源码提交 `e64e0ee`，成功构建
+  [37638619226](https://github.com/YoungSx/musubi/actions/runs/37638619226)。
+- Windows 和 macOS CI 均为 `161 passed, 0 failed`。
+- `tools/verify_multitouch.gd` 的 390×844 渲染回放通过：独立双抓点、
+  额外双指环绕/缩放、额外三指平移、镜头平滑期间抓点不跳、越过 UI 松手、
+  地面场景允许触屏环绕。旧鼠标 mannequin 回放也通过。
+- IPA 校验后使用原签名账户覆盖安装成功；手机 Installation Proxy 返回
+  `Musubi` / `0.9.2` / `User`。
+- 手机上的实际多指操作手感、持续帧率和内存仍待用户实测；不能用桌面回放
+  代替这些结论。下文首次安装的启动日志属于 0.9.1。
+- 本地 `build/ios/Reinstall-Musubi.cmd` 已指向本次 0.9.2 产物。
+
 ## 已验证的云端构建路线
 
 Windows 用户无需本地 Mac 或下载 Xcode：仓库的
