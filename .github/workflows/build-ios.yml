@@ -1,0 +1,88 @@
+name: Build iPhone IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/iphone-install]
+    paths:
+      - .github/workflows/build-ios.yml
+      - export_presets.cfg
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      GODOT_VERSION: 4.7.2-stable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install official Godot and iOS template
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          base="https://github.com/godotengine/godot-builds/releases/download/$GODOT_VERSION"
+          editor="Godot_v${GODOT_VERSION}_macos.universal.zip"
+          templates="Godot_v${GODOT_VERSION}_export_templates.tpz"
+          curl -fsSL --retry 3 "$base/$editor" -o "$editor"
+          curl -fsSL --retry 3 "$base/$templates" -o "$templates"
+          curl -fsSL --retry 3 "$base/SHA512-SUMS.txt" -o SHA512-SUMS.txt
+          grep -E " (${editor//./\\.}|${templates//./\\.})$" SHA512-SUMS.txt > selected-sums.txt
+          test "$(wc -l < selected-sums.txt | tr -d ' ')" = 2
+          shasum -a 512 -c selected-sums.txt
+          unzip -q "$editor" -d godot
+          template_dir="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION/-/.}"
+          mkdir -p "$template_dir"
+          unzip -j -q "$templates" templates/ios.zip templates/version.txt -d "$template_dir"
+          echo "$RUNNER_TEMP/godot/Godot.app/Contents/MacOS" >> "$GITHUB_PATH"
+      - name: Import project and export Xcode project
+        run: |
+          set -euo pipefail
+          mkdir -p build/ios
+          Godot --headless --path . --editor --import
+          Godot --headless --path . --export-release iOS build/ios/Musubi.xcodeproj
+      - name: Compile unsigned iPhone app
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project build/ios/Musubi.xcodeproj \
+            -scheme Musubi \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/ios/Musubi.xcarchive" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            | tee build/ios/xcodebuild.log
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          cd build/ios
+          mkdir Payload
+          cp -R Musubi.xcarchive/Products/Applications/Musubi.app Payload/
+          test -f Payload/Musubi.app/Musubi
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Payload/Musubi.app/Info.plist
+          file Payload/Musubi.app/Musubi
+          zip -qr Musubi-unsigned.ipa Payload
+          shasum -a 256 Musubi-unsigned.ipa > Musubi-unsigned.ipa.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Musubi-iPhone-unsigned
+          path: |
+            build/ios/Musubi-unsigned.ipa
+            build/ios/Musubi-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: ios-build-log
+          path: build/ios/xcodebuild.log
+          retention-days: 7
