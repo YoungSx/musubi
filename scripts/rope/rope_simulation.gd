@@ -372,6 +372,19 @@ func get_point(index: int) -> Vector3:
 	return _positions[index]
 
 
+## World position of a material coordinate, the same 0..1 parameter begin_grip
+## takes. Lets a caller holding a material coordinate ask where that material is
+## without claiming a grip for it.
+func get_material_position(material_u: float) -> Vector3:
+	if not is_finite(material_u) or material_u < 0.0 or material_u > 1.0:
+		return Vector3.ZERO
+	var coordinate := material_u * float(_positions.size() - 1)
+	if absf(coordinate - roundf(coordinate)) < 1e-8:
+		coordinate = roundf(coordinate)
+	var index := floori(coordinate)
+	return _positions[index].lerp(_positions[mini(index + 1, _positions.size() - 1)], coordinate - index)
+
+
 ## Copy-on-write snapshot. Do not keep it across steps, or every step pays
 ## for a copy.
 func get_positions() -> PackedVector3Array:

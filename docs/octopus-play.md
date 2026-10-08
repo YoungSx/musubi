@@ -2,8 +2,8 @@
 
 `res://scenes/main/octopus_play.tscn` is the default scene. A third-person
 octopus is driven by two virtual sticks: the left one walks it over the floor
-and up the mannequin, the right one flicks an elastic arm out to grab the rope
-and taps to let go. Carrying the rope is just walking while holding it.
+and up the mannequin, the right one aims an elastic arm at the rope and grabs
+on release. Carrying the rope is just walking while holding it.
 
 This replaces direct rope touching as the play scheme. `play.tscn` and
 `main.tscn` are untouched, so the touch-drag mode, its HUD and its tests still
@@ -14,15 +14,23 @@ run as before.
 | Input | Effect |
 | --- | --- |
 | Left stick | Walk. The stick is read in the view's frame on level ground and in the surface's fall line while climbing, so pushing up always means "away from the camera, up the wall". |
-| Right stick flick | Reach for rope along the flicked direction. |
-| Right stick tap | Let go. |
+| Right stick, held | Aim. A ring marks the material a release would take; a dim ray alone means nothing is in reach that way. |
+| Right stick, released off centre | Grab the marked material. |
+| Right stick, released at centre | Let go. |
 | Keyboard `WASD` | Same locomotion, for desktop checks. |
 
 Both sticks are the engine's own `VirtualJoystick`, which presses input actions
-with analog strength. Locomotion is therefore read with `Input.get_vector()`
-and the mode keeps no touch bookkeeping. The sticks are `JOYSTICK_FIXED` about
-their own centre, and `flicked`/`tapped` are what separate a grab from a
-release: a lift with a non-zero vector flicks, a lift at rest taps.
+with analog strength, so both are read with `Input.get_vector()` and the mode
+keeps no touch bookkeeping. The sticks are `JOYSTICK_FIXED` about their own
+centre.
+
+The grab and the let-go are both driven by `released` alone, not by
+`flicked`/`tapped`. Those two leave gestures unanswered: `VirtualJoystick`
+flicks on *any* lift outside the deadzone, so speed is irrelevant and a
+30-frame hold still flicks, while `tapped` fires only when the finger never
+moved at all — a lift that drifted a few pixels inside the deadzone fires
+neither. Both gestures ask one question, where the stick was when the finger
+left, and answering it from the single release event leaves no lift unanswered.
 
 ## Behavior
 
@@ -43,18 +51,18 @@ release: a lift with a non-zero vector flicks, a lift at rest taps.
   right, screen up its up. It deliberately ignores the climbing surface, which
   may be any wall, but it keeps the camera's pitch — rope hangs above a body on
   the floor, and a horizon-locked aim can never reach it.
-- A flick picks the nearest draggable, visible rope point inside a 35° cone,
+- A grab picks the nearest draggable, visible rope point inside a 35° cone,
   measured on the view plane. A two-axis stick spans that plane and carries no
   depth, so the cone flattens both the aim and the candidate offset by the
   camera's view normal before comparing them; only the distance ranking stays in
   world space. Comparing a plane-bound aim against a full 3D offset instead caps
   the achievable cosine at the offset's planar fraction, which rejects material
-  the flick points straight at — at any cone width. That was the shipped defect
+  the aim points straight at — at any cone width. That was the shipped defect
   in `5108cbe`: from the figure the measured cosine was 0.619 against a 0.819
   threshold, and no material anywhere in view cleared it.
-- An aimless tap takes the nearest visible point instead, the usual twin-stick
-  fallback. Visibility uses the same `RopeVisibility` sampling the touch scheme
-  uses.
+- A release at the centre takes the nearest visible point instead, the usual
+  twin-stick fallback. Visibility uses the same `RopeVisibility` sampling the
+  touch scheme uses.
 - The arm has no length limit. Extension is an animation parameter only: the
   published tip travels from shoulder to anchor over `reach_time`, so the arm
   reads as stretching rather than snapping, and once extended the tip is the
@@ -79,6 +87,35 @@ release: a lift with a non-zero vector flicks, a lift at rest taps.
   offsets laterally off the ray, which is not implemented.
 - All eight arms are one `MultiMesh` bead chain: a single draw call, and no
   second tube-mesh builder beside the rope's.
+
+## Aim feedback
+
+The grab resolves on release, so without feedback during the gesture the player
+aims blind and learns the result only once the gesture is spent. Two surfaces
+answer that, both driven from the same place the grab is:
+
+- While the stick is held, `AimIndicator` draws a ray from the body and a ring
+  on the material a release would take. The preview calls `Octopus.aim_material`,
+  which runs the same `pick` with the same cone and the same visibility test the
+  grab runs, so the ring cannot promise material the grab would refuse. Nothing
+  in reach draws the bearing alone, dimmed.
+- A grab that found nothing says so in the hint line for 1.6 s. The cone and the
+  line of sight both fail silently, and a silent failure is indistinguishable
+  from a stick that does nothing — which is how the working-but-unread aim stick
+  in `5108cbe` read as broken.
+
+The ring is drawn on the canvas rather than placed in the world because the
+aimed material is often behind the figure being climbed, and feedback the figure
+can hide is feedback the player cannot rely on. A target off the edge of the
+screen keeps its true position rather than being clamped onto it: clamping would
+put the ring where the material is not, and `_draw` is not clipped to the
+control's rect, so the ray's visible part still carries the bearing.
+
+Two engine facts shape this. `Camera3D.unproject_position` does not report that
+a point is behind the camera — it returns a plausible-looking position — so
+`is_position_behind` is checked separately for both the eye and the target.
+And the mode owns `_aim_locked` itself rather than reading the state back out of
+the indicator, which presents that state and does not define it.
 
 ## Boundaries
 
@@ -107,34 +144,53 @@ this exact build, 4.7.2-stable `ed1daf0bf`.
 
 ## Verification
 
-- `tests/run_tests.gd`: 202 tests pass. The 32 new ones cover floor and body
+- `tests/run_tests.gd`: 210 tests pass. The 40 new ones cover floor and body
   adhesion, climbing a convex edge while holding clearance, falling and
   landing, ledge departure keeping momentum, the floor/limb crease being
   crossable, the control frame on level ground and on a climbed face, aim
-  mapping through the camera frame including pitch, a flick reaching material
+  mapping through the camera frame including pitch, an aim reaching material
   above the body, cone accept/reject, the cone being measured on the view plane
   rather than against depth, material centred on screen being reachable by any
-  flick, grip claim/release/re-take, grip-id independence from finger grips,
+  aim, grip claim/release/re-take, grip-id independence from finger grips,
   rate-limited carry, unbounded reach, bow behaviour, camera framing, turn rate,
   the origin-clearance dolly and the deliberate absence of a line-of-sight
   dolly.
+- The eight aim-feedback tests cover every lift being answered as a grab or a
+  let-go including the drifted lift `flicked`/`tapped` miss; the held stick
+  marking material, the ring landing on the rope as projected, and a release
+  there taking the material that was marked; an aim at nothing showing its
+  bearing and saying so; a missed grab reporting it and the notice outliving the
+  next frame's steady hint; nothing being marked while already holding; the
+  overlay passing touches through to the sticks; an off-screen target keeping
+  its true position; and `get_material_position` sampling the same point a grip
+  taken at that coordinate reports.
 - `tools/verify_octopus.gd`: 390×844 portrait rendered replay, 0 failures in ten
   consecutive runs. Ten rather than one because the grab happens wherever the
-  flick lands — material 0.48 m to 0.80 m out across those runs — and a single
+  aim lands — material 0.48 m to 0.80 m out across those runs — and a single
   clean run cannot tell a sound bound from a lucky sample. Every
   movement, grab and release comes from synthetic touch events on the on-screen
   sticks through Godot's input dispatch, not from calling the octopus directly.
-  It checks floor adhesion; a flick from the floor grabbing material overhead
-  0.80 m out, past twice its own mantle width, with the arm starting short of it
-  and reaching full extension over later frames to draw the material inward;
-  stick-driven walking; climbing until rope is in sight with a tilted frame and
-  positive clearance; a flick grab from the figure claiming exactly one grip
-  with the extended tip holding its material; carrying — the grip surviving, the
-  reel still asking the material inward, the material riding at what it asks,
-  ground gained on the body, and the rope not tearing; tap
+  It checks floor adhesion; an aim-stick release from the floor grabbing
+  material overhead 0.80 m out, past twice its own mantle width, with the arm
+  starting short of it and reaching full extension over later frames to draw the
+  material inward; stick-driven walking; climbing until rope is in sight with a
+  tilted frame and positive clearance; a grab from the figure claiming exactly
+  one grip with the extended tip holding its material; carrying — the grip
+  surviving, the reel still asking the material inward, the material riding at
+  what it asks, ground gained on the body, and the rope not tearing; a centred
   release with the rope still simulating; and camera framing and clearance.
   Captures `octopus-start`, `octopus-reach`, `octopus-climb`, `octopus-grab`,
   `octopus-carry`, `octopus-release`.
+- The figure stage holds the aim stick out and inspects it before the lift, which
+  is the only window a preview can help in: the marker reads `LOCKED` while
+  nothing is yet grabbed, the ring sits on the rope as projected, the lift then
+  claims the material the ring was on, and the marker clears. The lift is checked
+  in material coordinates, not world position — the rope keeps falling between
+  the preview and the grab, so the material keeps its identity while its position
+  does not. Within one segment, because the pick is per particle. This stage has
+  three clean runs, not the ten behind the older claims above — enough to watch
+  the ring gap and its bound move together (0.23 px against 0.40 px, 6.19 against
+  7.36, 6.72 against 7.45) rather than to settle a bound.
 - The replay asserts the order of the stretch, not mid-stretch magnitudes: a
   step advances extension by `delta / reach_time`, so at the replay's frame rate
   the arm saturates within a few frames and any specific partial value is the
@@ -150,10 +206,20 @@ this exact build, 4.7.2-stable `ed1daf0bf`.
   fixed length would be a coincidence. Carrying is asserted by sign only: the
   reel pulls at `reel_speed` 0.7 m/s while the carry point retreats at no more
   than `move_speed` 0.55 m/s, so the gap can only shrink, but how far it shrinks
-  depends on what the rope drags over. Three earlier attempts to bound these by
-  a fitted figure — a fraction of the hold span, a flat 0.5 m, and a reach
-  clamp that `octopus_play.tscn` pins nothing to trigger — each passed once and
-  then failed, which is why the assertion messages print their own measurements.
+  depends on what the rope drags over. The ring check is bounded the same way, by
+  how far the marked material itself moves on screen in a frame: the mode draws
+  the ring from its own `_process` while the rope keeps its fixed-step schedule,
+  so the mark is a frame stale by construction and that motion is the floor on
+  any pixel figure. It is measured at the marked material rather than over the
+  whole rope, so a whipping free end cannot buy slack for a misplaced ring, and
+  after the ring and material readings so all three stay in one frame. Four
+  earlier attempts to bound these by a fitted figure — a fraction of the hold
+  span, a flat 0.5 m, a reach clamp that `octopus_play.tscn` pins nothing to
+  trigger, and a flat 1.0 px on the ring — each passed once and then failed,
+  which is why the assertion messages print their own measurements. The ring
+  bound is the clearest case: the gap read 1.13 px against the fitted 1.0 px,
+  then 6.72 px on the next run while its self-measured bound moved with it to
+  7.45 px. The figure was frame phase all along, which no constant can track.
 
 No performance or physical-touch acceptance is inferred from the desktop
 replay.

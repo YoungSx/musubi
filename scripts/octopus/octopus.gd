@@ -61,6 +61,21 @@ func grab(direction: Vector3, view_normal := Vector3.ZERO) -> bool:
 	return true
 
 
+## Material coordinate a grab along this aim would take, or -1.0 for nothing,
+## following pick()'s own convention.
+##
+## This is what makes an aim preview honest: it runs the same pick with the same
+## cone and the same visibility test grab() runs, so a caller cannot show a target
+## the grab would then refuse. It claims nothing and mutates nothing.
+func aim_material(direction: Vector3, view_normal := Vector3.ZERO) -> float:
+	return OctopusGrab.pick(rope, get_eye(), direction, config.get_aim_cone_cosine(), view_normal)
+
+
+## World position of a material coordinate from aim_material().
+func get_material_position(material_u: float) -> Vector3:
+	return rope.get_simulation().get_material_position(material_u)
+
+
 func release() -> void:
 	if not _grab.is_active():
 		return
