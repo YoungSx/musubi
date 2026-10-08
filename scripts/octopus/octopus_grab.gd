@@ -29,7 +29,15 @@ func is_active() -> bool:
 ## nothing qualifies. A zero direction drops the cone test and simply takes the
 ## nearest visible point, which is the conventional twin-stick fallback for a
 ## tap with no aim.
-static func pick(rope: Rope, origin: Vector3, direction: Vector3, cone_cosine: float) -> float:
+##
+## `view_normal` is the axis the aim carries no information about: a stick has two
+## degrees of freedom, so an aim built from one spans the view plane and says
+## nothing about depth. Given that axis, the cone is measured on the plane the
+## gesture lives in, which is what the player is aiming on. Measuring it against
+## the full offset instead would reject material the flick points straight at
+## whenever it also sits far up the view axis, at any cone width. Ranking stays
+## in world space, because "nearest" is a property of the world, not the screen.
+static func pick(rope: Rope, origin: Vector3, direction: Vector3, cone_cosine: float, view_normal := Vector3.ZERO) -> float:
 	var simulation := rope.get_simulation()
 	if simulation == null:
 		return -1.0
@@ -38,6 +46,7 @@ static func pick(rope: Rope, origin: Vector3, direction: Vector3, cone_cosine: f
 		return -1.0
 	var collision := rope.get_collision()
 	var aim := direction.normalized() if direction.length_squared() > 1e-8 else Vector3.ZERO
+	var normal := view_normal.normalized() if view_normal.length_squared() > 1e-8 else Vector3.ZERO
 	var best := -1
 	var best_distance := INF
 	for i in count:
@@ -48,7 +57,7 @@ static func pick(rope: Rope, origin: Vector3, direction: Vector3, cone_cosine: f
 		var distance := offset.length()
 		if distance >= best_distance:
 			continue
-		if aim != Vector3.ZERO and distance > 1e-4 and offset.dot(aim) / distance < cone_cosine:
+		if aim != Vector3.ZERO and distance > 1e-4 and not _within_cone(offset, aim, normal, cone_cosine):
 			continue
 		if collision != null and not RopeVisibility.is_visible(origin, point, collision):
 			continue
@@ -57,12 +66,28 @@ static func pick(rope: Rope, origin: Vector3, direction: Vector3, cone_cosine: f
 	return float(best) / float(count - 1) if best >= 0 else -1.0
 
 
+## Whether an offset lies inside the aim cone. Without a view normal the test is
+## the plain spatial one. With it, both vectors are flattened onto the view plane
+## first; an offset that vanishes there projects onto the body itself, so no flick
+## direction can disagree with it and it is accepted.
+static func _within_cone(offset: Vector3, aim: Vector3, view_normal: Vector3, cone_cosine: float) -> bool:
+	if view_normal == Vector3.ZERO:
+		return offset.dot(aim) / offset.length() >= cone_cosine
+	var planar := offset - view_normal * offset.dot(view_normal)
+	if planar.length_squared() <= 1e-8:
+		return true
+	var planar_aim := aim - view_normal * aim.dot(view_normal)
+	if planar_aim.length_squared() <= 1e-8:
+		return true
+	return planar.normalized().dot(planar_aim.normalized()) >= cone_cosine
+
+
 ## Grabs the picked material. Returns false when the aim finds nothing or the
-## rope refuses the grip.
-func grab(origin: Vector3, direction: Vector3) -> bool:
+## rope refuses the grip. `view_normal` is the axis the aim omits; see pick().
+func grab(origin: Vector3, direction: Vector3, view_normal := Vector3.ZERO) -> bool:
 	if _active or _rope == null or _config == null:
 		return false
-	var material_u := pick(_rope, origin, direction, _config.get_aim_cone_cosine())
+	var material_u := pick(_rope, origin, direction, _config.get_aim_cone_cosine(), view_normal)
 	if material_u < 0.0:
 		return false
 	if not _rope.begin_grip(material_u, GRIP_ID):

@@ -108,6 +108,56 @@ func test_aim_reaches_material_hanging_above_the_body() -> void:
 	assert_true(OctopusGrab.pick(rope, eye, level, cos(deg_to_rad(35.0))) < 0.0, "a level aim at the same bearing cannot reach it")
 
 
+func test_aim_cone_is_measured_on_the_view_plane_not_against_depth() -> void:
+	var rope := _rope()
+	var simulation := rope.get_simulation()
+	var view := CameraRig.orbit_basis(deg_to_rad(-25.0), deg_to_rad(18.0))
+	var cone := cos(deg_to_rad(35.0))
+	# An eye a few centimetres off the material along the viewing axis, which is
+	# where a climbing body sits. Most of that short distance is depth the stick
+	# cannot express, so the planar fraction caps the cosine a full-offset test can
+	# ever see for this material, and here it caps it below the cone. No cone width
+	# would reach it.
+	var index := simulation.get_point_count() / 2
+	var target := simulation.get_point(index)
+	var eye := target - view.z * 0.05 - view.x * 0.012 - view.y * 0.009
+	var offset := target - eye
+	var planar_fraction := (offset - view.z * offset.dot(view.z)).length() / offset.length()
+	assert_true(planar_fraction < cone, "the aimed material is depth-dominated at %.3f" % planar_fraction)
+	assert_true(RopeVisibility.is_visible(eye, target, rope.get_collision()), "and it is visible from the eye")
+
+	# The flick a player makes, read off the screen: the aim the stick can produce
+	# is the offset's projection onto the view plane.
+	var screen := Vector2(view.x.dot(offset.normalized()), -view.y.dot(offset.normalized())).normalized()
+	var aim := OctopusMode.aim_direction(screen, view)
+	var spatial := OctopusGrab.pick(rope, eye, aim, cone)
+	var planar := OctopusGrab.pick(rope, eye, aim, cone, view.z)
+	var span := float(simulation.get_point_count() - 1)
+	assert_true(absf(spatial * span - index) > 1.0, "measured against the full offset the flick cannot take the material it points at")
+	assert_near(planar * span, index, "measured on the view plane it takes exactly that material", 1.0)
+
+	# The plane test still has to reject: a flick the other way must not grab.
+	var away := OctopusMode.aim_direction(-screen, view)
+	assert_true(OctopusGrab.pick(rope, eye, away, cone, view.z) < 0.0, "a flick away from the material still misses")
+
+	var grab := _grab(rope)
+	assert_true(grab.grab(eye, aim, view.z), "the grab goes through with the view axis supplied")
+	assert_eq(rope.get_simulation().get_grip_count(), 1, "and claims one grip")
+
+
+func test_material_centred_on_screen_is_reachable_by_any_flick() -> void:
+	var rope := _rope()
+	var simulation := rope.get_simulation()
+	var view := CameraRig.orbit_basis(deg_to_rad(-25.0), deg_to_rad(18.0))
+	var target := simulation.get_point(simulation.get_point_count() / 2)
+	# Straight down the viewing axis: the material projects onto the body itself,
+	# so there is no screen direction to disagree with.
+	var eye := target - view.z * 0.06
+	for screen in [Vector2(0.0, -1.0), Vector2(1.0, 0.0), Vector2(0.0, 1.0), Vector2(-1.0, 0.0)]:
+		var aim := OctopusMode.aim_direction(screen, view)
+		assert_true(OctopusGrab.pick(rope, eye, aim, cos(deg_to_rad(35.0)), view.z) >= 0.0, "a flick %v reaches material centred on the body" % screen)
+
+
 func _rope() -> Rope:
 	var rope := add_to_tree(load("res://scenes/rope/rope.tscn").instantiate()) as Rope
 	rope.hold_on_release = false

@@ -2,12 +2,43 @@
 
 核查日期：2026-10-07。项目：Godot 4.7.2 / GDScript / Mobile renderer。
 
+## 0.9.4 章鱼操作
+
+- 源码提交 `5108cbe`，成功构建
+  [37759028343](https://github.com/YoungSx/musubi/actions/runs/37759028343)。
+- macOS CI `200 passed, 0 failed`。仓库只有
+  `.github/workflows/build-ios.yml` 一条 macOS workflow，Windows 为本机运行，
+  没有 Windows CI。
+- IPA 使用原账户签名覆盖安装成功：xtool 返回 `Successfully installed!`（exit=0），
+  手机 Installation Proxy 确认 `Musubi` / 版本 `0.9.4` / build `0.9.4` /
+  MinOS `16.0`，bundle 为 `XTL-5W6H7M2ZA3.com.youngsx.musubi`。
+- 新默认场景是 `scenes/main/octopus_play.tscn`：双虚拟摇杆驱动第三人称章鱼，
+  左摇杆在地面和人偶表面行走攀爬，右摇杆甩出弹性手臂抓绳、点击松手。
+  触屏拖拽的 `play.tscn` / `main.tscn` 原样保留。行为与边界见
+  [章鱼操作说明](octopus-play.md)。
+- **已装到手机上的 `5108cbe` 不能用摇杆抓住绳子。** 瞄准摇杆只有两轴，方向
+  完全落在镜头视平面上不含深度，而当时的 `OctopusGrab.pick` 拿这个方向与
+  完整三维偏移比较锥角：站在人偶上实测 cosine 0.619 对阈值 0.819，视野内
+  任何绳索材料都过不了锥角，放宽角度也没用。修复是把锥角改到手势所在的
+  视平面上测量（距离排序仍在世界空间），**不在这个 IPA 里**。
+  手机上的抓取需要重新构建、重新安装后才能验证。
+- 修复后的工作区本机 `tests/run_tests.gd` `202 passed, 0 failed`，
+  `tools/verify_octopus.gd` 的 390×844 渲染回放连续十次 0 failures。十次而不是
+  一次：抓取落在甩动指到的地方，记录到的落点在 0.48 m 到 0.80 m 之间，
+  单次干净跑不出边界成立还是样本走运。这是桌面结论；真实触屏手感、持续帧率
+  和内存仍待用户实测，不将桌面回放报告为手机手势验收。
+- 本机 `build/ios/Reinstall-Musubi.cmd` 已指向本次产物
+  `37759028343`，但其中的 xtool 调用没有带下文的 proxychains shim，
+  按现状直接运行会复现 provisioning 超时。
+
 ## 0.9.3 辅助跟随镜头
 
 - 源码提交 `fcbebcb`，成功构建
   [37647051603](https://github.com/YoungSx/musubi/actions/runs/37647051603)。
-- Windows 和 macOS CI 均为 `170 passed, 0 failed`；辅助跟随、多指竖屏、
-  自由模式鼠标回放通过。行为与边界见 [辅助镜头说明](assisted-camera.md)。
+- macOS CI `170 passed, 0 failed`；辅助跟随、多指竖屏、自由模式鼠标回放通过。
+  行为与边界见 [辅助镜头说明](assisted-camera.md)。该条原记为
+  “Windows 和 macOS CI 均为”，但仓库从未有过 Windows workflow，
+  Windows 结果来自本机运行。
 - IPA 校验后使用原账户签名覆盖安装成功，手机应用元数据确认 `Musubi` / `0.9.3`。
 - 新场景默认 `Assisted follow`，Menu 的 Camera 部分可切换 `Free camera`；
   真实触屏手感交由用户试用，本次不将桌面回放报告为手机手势验收。
@@ -17,7 +48,7 @@
 
 - 源码提交 `e64e0ee`，成功构建
   [37638619226](https://github.com/YoungSx/musubi/actions/runs/37638619226)。
-- Windows 和 macOS CI 均为 `161 passed, 0 failed`。
+- macOS CI `161 passed, 0 failed`；同上，Windows 结果来自本机运行而非 CI。
 - `tools/verify_multitouch.gd` 的 390×844 渲染回放通过：独立双抓点、
   额外双指环绕/缩放、额外三指平移、镜头平滑期间抓点不跳、越过 UI 松手、
   地面场景允许触屏环绕。旧鼠标 mannequin 回放也通过。
@@ -47,6 +78,10 @@ Apple 登录、开发签名和手机安装留在本机，不使用 GitHub Secret
 - xtool 的 `auth login --mode password` 由用户在本机终端完成；
   `install <ipa路径>` 可为 IPA 签名并安装，不需要本地 Swift / Xcode SDK。
   不要将账户密码、验证码、签名密钥或登录令牌提交到仓库。
+- xtool 不在 PATH 上。它是解包后的 AppImage，入口是
+  `/home/shangxin/.local/share/musubi-ios/squashfs-root/AppRun`
+  （symlink → `usr/bin/xtool`，1.21.0）。按 `xtool` 这个名字搜索整台机器都找不到，
+  必须用这个绝对路径调用。
 
 本次已完成 Apple 登录、签名和 USB 安装：xtool 返回 `Successfully installed!`，
 随后通过手机的 Installation Proxy 再次确认 `Musubi` / `0.9.1` 已安装。
@@ -68,6 +103,30 @@ xtool 的自动启动命令在本机返回 InstallationProxy 错误；最终启�
 ```powershell
 gh run download 37632979914 -n Musubi-iPhone-unsigned -D build/ios/artifacts/37632979914
 ```
+
+### 本机网络：provisioning 必须走 proxychains shim
+
+此机器直连 Apple 开发者 API 超时，代理是唯一出口；而 xtool 用自己的 Swift HTTP
+客户端（AsyncHTTPClient），**不读 `http_proxy` / `https_proxy`**，设这些变量对它无效。
+可行的做法是用户目录下的 proxychains-ng `LD_PRELOAD` shim 钩住 `connect()`，
+不动 `/etc/hosts`、不占 443、不需要 root：
+
+```bash
+WORK=$HOME/.local/opt/proxychains
+export LD_PRELOAD=$WORK/root/usr/lib/x86_64-linux-gnu/libproxychains.so.4
+export PROXYCHAINS_CONF_FILE=$WORK/proxychains.conf
+export PROXYCHAINS_QUIET_MODE=1
+export USBMUXD_SOCKET_ADDRESS=127.0.0.1:27015
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+/home/shangxin/.local/share/musubi-ios/squashfs-root/AppRun install --usb <ipa路径>
+```
+
+`proxychains.conf` 的首条 `localnet 127.0.0.0/255.0.0.0` 让 usbmuxd 的
+`127.0.0.1:27015` 保持直连，`[ProxyList]` 里的 `socks5 127.0.0.1 7890`
+只承载 provisioning 流量；两者不能互换。0.9.4 的签名与安装就是这样跑通的。
+`build/ios/Reinstall-Musubi.cmd` 和 `build/ios/apple-login.sh` 都还是裸调用，
+没有这层 shim；`auth login` 也走同一条网络，需要时同样套这层 shim。
+proxychains 装在 `$HOME/.local/opt/proxychains`，不在仓库里，也不是系统包。
 
 下文保留的是本地 WSL 交叉编译调研，当前云端构建路线不依赖这些前置步骤。
 

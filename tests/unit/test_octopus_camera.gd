@@ -66,7 +66,7 @@ func test_a_blocked_line_of_sight_does_not_dolly_the_view_in() -> void:
 	# always within its own radius of the occluder; it only crops the scene.
 	var part := MannequinPart.new()
 	part.primitive = MannequinPart.Primitive.BOX
-	part.size = Vector3(2.0, 2.0, 0.1)
+	part.box_size = Vector3(2.0, 2.0, 0.1)
 	part.position = Vector3(0.0, 0.5, 0.6)
 	var config := MannequinConfig.new()
 	config.parts = [part]

@@ -7,6 +7,9 @@ export_credentials.cfg
 /build/
 /.idea/
 
+# Replay captures from tools/verify_octopus.gd
+/.verify/
+
 # OS
 .DS_Store
 Thumbs.db
