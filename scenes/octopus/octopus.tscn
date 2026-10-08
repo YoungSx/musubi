@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/octopus/octopus.gd" id="1_octopus"]
+[ext_resource type="Resource" path="res://data/octopus/default_octopus.tres" id="2_config"]
+[ext_resource type="Script" path="res://scripts/octopus/octopus_skin.gd" id="3_skin"]
+[ext_resource type="Material" path="res://assets/materials/octopus.tres" id="4_material"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_mantle"]
+radius = 0.055
+height = 0.075
+radial_segments = 20
+rings = 10
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+radius = 0.012
+height = 0.024
+radial_segments = 10
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+resource_name = "OctopusEye"
+albedo_color = Color(0.1, 0.09, 0.12, 1)
+roughness = 0.2
+
+[node name="Octopus" type="Node3D" node_paths=PackedStringArray("skin")]
+script = ExtResource("1_octopus")
+config = ExtResource("2_config")
+skin = NodePath("Arms")
+
+[node name="Mantle" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.022, 0)
+mesh = SubResource("SphereMesh_mantle")
+surface_material_override/0 = ExtResource("4_material")
+
+[node name="EyeLeft" type="MeshInstance3D" parent="Mantle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.024, 0.022, -0.036)
+mesh = SubResource("SphereMesh_eye")
+surface_material_override/0 = SubResource("StandardMaterial3D_eye")
+
+[node name="EyeRight" type="MeshInstance3D" parent="Mantle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.024, 0.022, -0.036)
+mesh = SubResource("SphereMesh_eye")
+surface_material_override/0 = SubResource("StandardMaterial3D_eye")
+
+[node name="Arms" type="MultiMeshInstance3D" parent="."]
+material_override = ExtResource("4_material")
+script = ExtResource("3_skin")

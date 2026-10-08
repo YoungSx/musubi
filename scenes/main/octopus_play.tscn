@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/octopus/octopus_mode.gd" id="1_mode"]
+[ext_resource type="PackedScene" path="res://scenes/environment/studio.tscn" id="2_studio"]
+[ext_resource type="PackedScene" path="res://scenes/mannequin/mannequin.tscn" id="3_mannequin"]
+[ext_resource type="PackedScene" path="res://scenes/rope/rope.tscn" id="4_rope"]
+[ext_resource type="Resource" path="res://data/rope/play_rope.tres" id="5_rope_config"]
+[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="6_camera"]
+[ext_resource type="Resource" path="res://data/camera/octopus_camera.tres" id="7_camera_config"]
+[ext_resource type="PackedScene" path="res://scenes/octopus/octopus.tscn" id="8_octopus"]
+[ext_resource type="PackedScene" path="res://scenes/ui/octopus_controls.tscn" id="9_controls"]
+
+[node name="OctopusPlay" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "octopus", "controls")]
+script = ExtResource("1_mode")
+camera_rig = NodePath("CameraRig")
+mannequin = NodePath("Mannequin")
+rope = NodePath("Rope")
+octopus = NodePath("Octopus")
+controls = NodePath("OctopusControls")
+
+[node name="Studio" parent="." instance=ExtResource("2_studio")]
+
+[node name="Mannequin" parent="." instance=ExtResource("3_mannequin")]
+
+[node name="Rope" parent="." instance=ExtResource("4_rope")]
+config = ExtResource("5_rope_config")
+initial_layout = 1
+hold_on_release = false
+
+[node name="CameraRig" parent="." instance=ExtResource("6_camera")]
+config = ExtResource("7_camera_config")
+
+[node name="Octopus" parent="." node_paths=PackedStringArray("rope") instance=ExtResource("8_octopus")]
+rope = NodePath("../Rope")
+
+[node name="OctopusControls" parent="." instance=ExtResource("9_controls")]
