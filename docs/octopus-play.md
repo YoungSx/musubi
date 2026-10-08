@@ -60,6 +60,15 @@ release: a lift with a non-zero vector flicks, a lift at rest taps.
   surface normal, eases its yaw behind sustained movement under a rate limit
   with a dead zone, and dollies in when its own origin would sit inside
   geometry.
+- The camera does **not** react to a blocked line of sight, so a body clinging
+  to the far side of a limb can be partly hidden. This is deliberate. A clinging
+  body is always within its own radius of the thing occluding it, so no distance
+  along the same view ray is clear: dollying in runs to the rig's minimum and
+  crops the figure and rope out of frame, which costs the player more than the
+  partial occlusion. Swinging the yaw instead, as the rope's
+  `FollowCameraController` does for grips in open space, would spin the view
+  while climbing between limbs. Resolving this properly needs a camera that
+  offsets laterally off the ray, which is not implemented.
 - All eight arms are one `MultiMesh` bead chain: a single draw call, and no
   second tube-mesh builder beside the rope's.
 
@@ -90,14 +99,15 @@ this exact build, 4.7.2-stable `ed1daf0bf`.
 
 ## Verification
 
-- `tests/run_tests.gd`: 199 tests pass. The 29 new ones cover floor and body
+- `tests/run_tests.gd`: 200 tests pass. The 30 new ones cover floor and body
   adhesion, climbing a convex edge while holding clearance, falling and
   landing, ledge departure keeping momentum, the floor/limb crease being
   crossable, the control frame on level ground and on a climbed face, aim
   mapping through the camera frame including pitch, a flick reaching material
   above the body, cone accept/reject, grip claim/release/re-take, grip-id
   independence from finger grips, rate-limited carry, unbounded reach, bow
-  behaviour, and camera framing/turn-rate/occlusion.
+  behaviour, camera framing, turn rate, the origin-clearance dolly and the
+  deliberate absence of a line-of-sight dolly.
 - `tools/verify_octopus.gd`: 390×844 portrait rendered replay. Every movement,
   grab and release comes from synthetic touch events on the on-screen sticks
   through Godot's input dispatch, not from calling the octopus directly. It

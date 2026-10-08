@@ -60,6 +60,26 @@ func test_view_pulls_in_when_its_origin_is_inside_geometry() -> void:
 	assert_true(rig.get_target_distance() >= rig.config.min_distance, "and respects the rig's own limit")
 
 
+func test_a_blocked_line_of_sight_does_not_dolly_the_view_in() -> void:
+	# A slab between the body and the camera, with the camera's own origin in
+	# open air. Pulling in here cannot clear the line, because a clinging body is
+	# always within its own radius of the occluder; it only crops the scene.
+	var part := MannequinPart.new()
+	part.primitive = MannequinPart.Primitive.BOX
+	part.size = Vector3(2.0, 2.0, 0.1)
+	part.position = Vector3(0.0, 0.5, 0.6)
+	var config := MannequinConfig.new()
+	config.parts = [part]
+	var collision := RopeCollision.new()
+	collision.floor_enabled = false
+	collision.configure(config)
+	var rig := _rig()
+	var camera := _camera(rig, collision)
+	var body := Vector3(0.0, 0.5, 0.0)
+	camera.update(0.1, body, Vector3.UP, Vector3.ZERO)
+	assert_near(rig.get_target_distance(), rig.config.distance, "the framing distance is held")
+
+
 func _rig() -> CameraRig:
 	var rig := load("res://scenes/camera/camera_rig.tscn").instantiate() as CameraRig
 	rig.config = load("res://data/camera/octopus_camera.tres")
