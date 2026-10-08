@@ -51,6 +51,11 @@ static func _turn(current: float, intent: Vector3, config: OctopusConfig, delta:
 
 ## Pulls the view in while its origin sits inside collision geometry. The rig
 ## clamps the result to its own distance range.
+##
+## It deliberately does not dolly in on a blocked line of sight. The body clings
+## to the geometry that occludes it, so no distance along the same ray is clear;
+## trying drives the camera to its minimum and crops the figure and rope out of
+## frame, which costs more than the partial occlusion it was meant to fix.
 func _clear_distance(focus: Vector3, yaw: float) -> float:
 	var distance := _rig.config.distance
 	if _collision == null:
