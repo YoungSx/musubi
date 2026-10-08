@@ -2,6 +2,30 @@
 
 核查日期：2026-10-07。项目：Godot 4.7.2 / GDScript / Mobile renderer。
 
+## 0.9.4 瞄准反馈（手机上的当前版本）
+
+- 源码提交 `3885fb6`，成功构建
+  [37822096932](https://github.com/YoungSx/musubi/actions/runs/37822096932)。
+  macOS CI `210 passed, 0 failed`，产物 `Musubi-iPhone-unsigned`（22,070,280 字节）
+  下载后 SHA-256 与 CI 记录的 `6604f0ed…5ac6a1` 一致。
+- 这个 IPA 带上了下面 `5108cbe` 条目里缺的两样东西：视平面锥角的抓取修复，
+  以及按住右摇杆时的瞄准反馈（射线加落点环、无目标时只画暗射线、
+  抓空时提示 1.6 s）。行为与边界见 [章鱼操作说明](octopus-play.md)。
+- 套 proxychains shim 后签名并 USB 覆盖安装成功：xtool 返回
+  `Successfully installed!`（exit=0），包含 Provisioning、Signing、Verifying 各阶段。
+- `xtool launch --usb XTL-5W6H7M2ZA3.com.youngsx.musubi` 仍返回
+  `DebugserverClient.Error.unknown`（exit=1），与 0.9.1 条目记的同一个已知限制。
+  它在报错前打印了 `Launching Musubi...`，说明手机的 Installation Proxy
+  能解析这个 bundle ID；但这不是启动成功，也不是版本号确认。
+  本机没有装 `pymobiledevice3` / `ideviceinstaller`，这次没有像 0.9.1–0.9.4
+  那样用 Installation Proxy 复查应用元数据。
+- **摇杆抓取和瞄准反馈在手机上仍未实测。** 桌面 `tools/verify_octopus.gd`
+  的 390×844 渲染回放 0 failures 是桌面结论，不代表触屏手感、持续帧率和内存验收。
+- 本机 `build/ios/Reinstall-Musubi.cmd` 和 `build/ios/apple-login.sh` 已带上
+  proxychains shim 并指向本次产物 `37822096932`，不再是会复现 provisioning
+  超时的裸调用。这两个脚本带机器绝对路径，落在 `.gitignore` 的 `/build/` 下，
+  只存在于本机，不进仓库；换机器要照下文那段重建。
+
 ## 0.9.4 章鱼操作
 
 - 源码提交 `5108cbe`，成功构建
@@ -27,9 +51,9 @@
   一次：抓取落在甩动指到的地方，记录到的落点在 0.48 m 到 0.80 m 之间，
   单次干净跑不出边界成立还是样本走运。这是桌面结论；真实触屏手感、持续帧率
   和内存仍待用户实测，不将桌面回放报告为手机手势验收。
-- 本机 `build/ios/Reinstall-Musubi.cmd` 已指向本次产物
-  `37759028343`，但其中的 xtool 调用没有带下文的 proxychains shim，
-  按现状直接运行会复现 provisioning 超时。
+- 这条记录写下时 `build/ios/Reinstall-Musubi.cmd` 指向本次产物
+  `37759028343`，且 xtool 调用没有带下文的 proxychains shim，按现状直接运行
+  会复现 provisioning 超时。两者都已在 `3885fb6` 之后修好，见本文件顶部条目。
 
 ## 0.9.3 辅助跟随镜头
 
@@ -124,9 +148,11 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 `proxychains.conf` 的首条 `localnet 127.0.0.0/255.0.0.0` 让 usbmuxd 的
 `127.0.0.1:27015` 保持直连，`[ProxyList]` 里的 `socks5 127.0.0.1 7890`
 只承载 provisioning 流量；两者不能互换。0.9.4 的签名与安装就是这样跑通的。
-`build/ios/Reinstall-Musubi.cmd` 和 `build/ios/apple-login.sh` 都还是裸调用，
-没有这层 shim；`auth login` 也走同一条网络，需要时同样套这层 shim。
-proxychains 装在 `$HOME/.local/opt/proxychains`，不在仓库里，也不是系统包。
+本机的 `build/ios/Reinstall-Musubi.cmd` 和 `build/ios/apple-login.sh` 现在都带这层
+shim，不再需要手敲上面这段。`auth login` 走同一条网络，所以两个脚本套的是同一组
+变量。这两个脚本和 proxychains 本身都不在仓库里：脚本带机器绝对路径、落在
+`.gitignore` 的 `/build/` 下，proxychains 装在 `$HOME/.local/opt/proxychains` 且不是
+系统包。换机器时按上面这段重建，不要指望从仓库里拿到它们。
 
 下文保留的是本地 WSL 交叉编译调研，当前云端构建路线不依赖这些前置步骤。
 
