@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CameraConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/camera/camera_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+focus = Vector3(0, 0.3, 0)
+distance = 1.3
+min_distance = 0.7
+max_distance = 2.6
+pitch_degrees = 18.0
+; The octopus roams the whole 12 m floor, so the rig's focus leash has to cover
+; it. The follow policy, not this limit, keeps the view near the body.
+max_focus_offset = 12.0
+smoothing = 10.0
+fov = 55.0

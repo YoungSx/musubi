@@ -4,11 +4,26 @@ An interactive study of rope, form and connection.
 
 Godot 4.7.2 / GDScript prototype, validating Windows locally first while keeping
 the simulation and touch input portable. Open `project.godot`
-in Godot and press F5 for the default play scene (`scenes/main/play.tscn`).
-The previous workbench remains available at `scenes/main/main.tscn` (F6).
-No third-party dependencies are required.
+in Godot and press F5 for the default scene (`scenes/main/octopus_play.tscn`).
+The touch-drag play scene remains at `scenes/main/play.tscn` and the workbench
+at `scenes/main/main.tscn` (F6). No third-party dependencies are required.
 
-## Current milestone: assisted camera (0.9.3)
+## Current milestone: octopus play (0.9.4)
+
+The default scene is a third-person octopus on two virtual sticks. The left
+stick walks it across the floor and up the mannequin, clinging to any surface.
+The right stick flicks an elastic arm out to grab the rope and taps to let go;
+with the rope held, walking carries it anywhere. The arm has no length limit,
+so it stretches out to its target instead of requiring the body to be adjacent.
+
+Adhesion reuses the rope's own signed-distance geometry, the grip reuses the
+same rope seam a finger uses, both sticks are the engine's `VirtualJoystick`,
+and the follow camera writes only through the existing rig. See [controls,
+boundaries and verification](docs/octopus-play.md).
+
+The direct touch-drag scheme from 0.9.3 is unchanged in `play.tscn`:
+
+## Previous milestone: assisted camera (0.9.3)
 
 New scenes default to **Assisted follow**. Fine movements keep the view stable;
 large drags near the edge and sustained occlusion trigger bounded reframing.
@@ -140,6 +155,16 @@ and double-click `Musubi.exe`, keeping `Musubi.pck` alongside it.
 | `scripts/core/app_controller.gd` | Scene wiring and Reset |
 | `scripts/interaction/`, `scripts/camera/` | Input gestures and camera intent |
 | `scripts/mannequin/`, `data/mannequin/` | Figure geometry and matching primitive collision shapes |
+| `scripts/octopus/octopus_config.gd`, `data/octopus/` | Octopus tunables; a variant is a resource, not code |
+| `scripts/octopus/surface_walker.gd` | Surface adhesion and the climbing control frame; pure geometry over an SDF |
+| `scripts/octopus/octopus_arm.gd` | Elastic reach geometry; no nodes, no rope |
+| `scripts/octopus/octopus_grab.gd` | One rope grip through the ordinary rope seam |
+| `scripts/octopus/octopus.gd` | Composes walker, arm and grip; owns no input or camera |
+| `scripts/octopus/octopus_skin.gd` | Tentacle bead chains in one MultiMesh; presentation only |
+| `scripts/octopus/octopus_camera.gd` | Follow policy, written through `CameraRig.apply_assisted_view()` |
+| `scripts/octopus/octopus_controls.gd` | Twin-stick layer; emits intents only |
+| `scripts/octopus/octopus_mode.gd` | The one place octopus play is wired and its frame order lives |
+| `scripts/ui/safe_area.gd` | Shared viewport-inset to margin conversion for the HUD and stick layer |
 
 The legacy workbench rope uses 48 segments, a 1.4 m rest length, 120 Hz simulation,
 6 substeps and 2 constraint iterations per substep. Catch-up is bounded after
@@ -165,6 +190,7 @@ godot --path . -s res://tools/verify_pass_assist.gd -- <output-directory>
 godot --path . -s res://tools/verify_play_mannequin.gd -- <output-directory>
 godot --path . -s res://tools/verify_multitouch.gd -- <output-directory>
 godot --path . -s res://tools/verify_assisted_follow.gd -- <output-directory>
+godot --path . -s res://tools/verify_octopus.gd -- <output-directory>
 godot --path . -s res://tools/verify_mouse_ground.gd -- <output-directory>
 godot --path . -s res://tools/verify_control_authority.gd -- <output-directory>
 godot --path . -s res://tools/probe_torso_lattice.gd -- <output-directory>
@@ -178,7 +204,7 @@ directory. Unit tests cover camera/gestures, mannequin construction, rope
 length, settling, repeatability, pins, mesh geometry and simulation reset.
 
 Windows verification used Godot 4.7.2 with Vulkan Forward Mobile on RTX 3070.
-All 170 tests passed. A rendered scene smoke check exercised camera orbit,
+All 199 tests passed. A rendered scene smoke check exercised camera orbit,
 zoom and pan, a temporary rope pin and release, and the HUD Reset signal.
 The rendered interaction smoke additionally sends mouse input through Godot's
 input dispatch, drags the rope, releases over the HUD and clicks Reset.

@@ -1,0 +1,75 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/octopus/octopus_controls.gd" id="1_controls"]
+
+[node name="OctopusControls" type="CanvasLayer"]
+script = ExtResource("1_controls")
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 24
+
+[node name="Layout" type="Control" parent="SafeArea"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Hint" type="Label" parent="SafeArea/Layout"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_type_variation = &"SubtitleLabel"
+horizontal_alignment = 1
+text = "Flick the right stick toward the rope"
+
+[node name="MoveStick" type="VirtualJoystick" parent="SafeArea/Layout"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -168.0
+offset_right = 160.0
+offset_bottom = -8.0
+grow_vertical = 0
+action_left = &"octopus_left"
+action_right = &"octopus_right"
+action_up = &"octopus_forward"
+action_down = &"octopus_back"
+joystick_size = 132.0
+tip_size = 58.0
+deadzone_ratio = 0.12
+clampzone_ratio = 0.95
+
+[node name="AimStick" type="VirtualJoystick" parent="SafeArea/Layout"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -168.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+action_left = &"octopus_aim_left"
+action_right = &"octopus_aim_right"
+action_up = &"octopus_aim_forward"
+action_down = &"octopus_aim_back"
+joystick_size = 132.0
+tip_size = 58.0
+deadzone_ratio = 0.18
+clampzone_ratio = 0.95

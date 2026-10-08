@@ -68,6 +68,58 @@ expand_margin_top = 2.0
 expand_margin_right = 2.0
 expand_margin_bottom = 2.0
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stick_base"]
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.22)
+corner_radius_top_left = 128
+corner_radius_top_right = 128
+corner_radius_bottom_right = 128
+corner_radius_bottom_left = 128
+corner_detail = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stick_base_pressed"]
+bg_color = Color(1, 1, 1, 0.05)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.38)
+corner_radius_top_left = 128
+corner_radius_top_right = 128
+corner_radius_bottom_right = 128
+corner_radius_bottom_left = 128
+corner_detail = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stick_tip"]
+bg_color = Color(1, 1, 1, 0.16)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.35)
+corner_radius_top_left = 128
+corner_radius_top_right = 128
+corner_radius_bottom_right = 128
+corner_radius_bottom_left = 128
+corner_detail = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stick_tip_pressed"]
+bg_color = Color(0.95, 0.93, 0.89, 0.5)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.7)
+corner_radius_top_left = 128
+corner_radius_top_right = 128
+corner_radius_bottom_right = 128
+corner_radius_bottom_left = 128
+corner_detail = 16
+
 [resource]
 default_font_size = 15
 Button/colors/font_color = Color(0.92, 0.9, 0.86, 0.85)
@@ -85,3 +137,7 @@ TitleLabel/font_sizes/font_size = 22
 SubtitleLabel/base_type = &"Label"
 SubtitleLabel/colors/font_color = Color(0.92, 0.9, 0.86, 0.45)
 SubtitleLabel/font_sizes/font_size = 12
+VirtualJoystick/styles/normal_joystick = SubResource("StyleBoxFlat_stick_base")
+VirtualJoystick/styles/normal_tip = SubResource("StyleBoxFlat_stick_tip")
+VirtualJoystick/styles/pressed_joystick = SubResource("StyleBoxFlat_stick_base_pressed")
+VirtualJoystick/styles/pressed_tip = SubResource("StyleBoxFlat_stick_tip_pressed")
