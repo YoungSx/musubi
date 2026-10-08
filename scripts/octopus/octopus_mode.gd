@@ -54,7 +54,10 @@ func _grab(aim: Vector2) -> void:
 	if octopus.is_holding():
 		octopus.release()
 		return
-	octopus.grab(aim_direction(aim, camera_rig.get_camera().global_transform.basis))
+	# The view axis goes along with the aim: aim_direction spans the view plane,
+	# so the cone has to be measured there too rather than against world depth.
+	var view := camera_rig.get_camera().global_transform.basis
+	octopus.grab(aim_direction(aim, view), view.z)
 	_update_hint()
 
 

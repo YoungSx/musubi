@@ -43,8 +43,16 @@ release: a lift with a non-zero vector flicks, a lift at rest taps.
   right, screen up its up. It deliberately ignores the climbing surface, which
   may be any wall, but it keeps the camera's pitch — rope hangs above a body on
   the floor, and a horizon-locked aim can never reach it.
-- A flick picks the nearest draggable, visible rope point inside a 35° cone. An
-  aimless tap takes the nearest visible point instead, the usual twin-stick
+- A flick picks the nearest draggable, visible rope point inside a 35° cone,
+  measured on the view plane. A two-axis stick spans that plane and carries no
+  depth, so the cone flattens both the aim and the candidate offset by the
+  camera's view normal before comparing them; only the distance ranking stays in
+  world space. Comparing a plane-bound aim against a full 3D offset instead caps
+  the achievable cosine at the offset's planar fraction, which rejects material
+  the flick points straight at — at any cone width. That was the shipped defect
+  in `5108cbe`: from the figure the measured cosine was 0.619 against a 0.819
+  threshold, and no material anywhere in view cleared it.
+- An aimless tap takes the nearest visible point instead, the usual twin-stick
   fallback. Visibility uses the same `RopeVisibility` sampling the touch scheme
   uses.
 - The arm has no length limit. Extension is an animation parameter only: the
@@ -99,24 +107,53 @@ this exact build, 4.7.2-stable `ed1daf0bf`.
 
 ## Verification
 
-- `tests/run_tests.gd`: 200 tests pass. The 30 new ones cover floor and body
+- `tests/run_tests.gd`: 202 tests pass. The 32 new ones cover floor and body
   adhesion, climbing a convex edge while holding clearance, falling and
   landing, ledge departure keeping momentum, the floor/limb crease being
   crossable, the control frame on level ground and on a climbed face, aim
   mapping through the camera frame including pitch, a flick reaching material
-  above the body, cone accept/reject, grip claim/release/re-take, grip-id
-  independence from finger grips, rate-limited carry, unbounded reach, bow
-  behaviour, camera framing, turn rate, the origin-clearance dolly and the
-  deliberate absence of a line-of-sight dolly.
-- `tools/verify_octopus.gd`: 390×844 portrait rendered replay. Every movement,
-  grab and release comes from synthetic touch events on the on-screen sticks
-  through Godot's input dispatch, not from calling the octopus directly. It
-  checks floor adhesion, stick-driven walking, climbing until rope is in sight
-  with a tilted frame and positive clearance, a flick grab claiming exactly one
-  grip, the arm stretching and then holding the material past its own body
-  width, carrying without tearing, tap release with the rope still simulating,
-  and camera framing and clearance. Captures `octopus-start`, `octopus-climb`,
-  `octopus-grab`, `octopus-carry`, `octopus-release`.
+  above the body, cone accept/reject, the cone being measured on the view plane
+  rather than against depth, material centred on screen being reachable by any
+  flick, grip claim/release/re-take, grip-id independence from finger grips,
+  rate-limited carry, unbounded reach, bow behaviour, camera framing, turn rate,
+  the origin-clearance dolly and the deliberate absence of a line-of-sight
+  dolly.
+- `tools/verify_octopus.gd`: 390×844 portrait rendered replay, 0 failures in ten
+  consecutive runs. Ten rather than one because the grab happens wherever the
+  flick lands — material 0.48 m to 0.80 m out across those runs — and a single
+  clean run cannot tell a sound bound from a lucky sample. Every
+  movement, grab and release comes from synthetic touch events on the on-screen
+  sticks through Godot's input dispatch, not from calling the octopus directly.
+  It checks floor adhesion; a flick from the floor grabbing material overhead
+  0.80 m out, past twice its own mantle width, with the arm starting short of it
+  and reaching full extension over later frames to draw the material inward;
+  stick-driven walking; climbing until rope is in sight with a tilted frame and
+  positive clearance; a flick grab from the figure claiming exactly one grip
+  with the extended tip holding its material; carrying — the grip surviving, the
+  reel still asking the material inward, the material riding at what it asks,
+  ground gained on the body, and the rope not tearing; tap
+  release with the rope still simulating; and camera framing and clearance.
+  Captures `octopus-start`, `octopus-reach`, `octopus-climb`, `octopus-grab`,
+  `octopus-carry`, `octopus-release`.
+- The replay asserts the order of the stretch, not mid-stretch magnitudes: a
+  step advances extension by `delta / reach_time`, so at the replay's frame rate
+  the arm saturates within a few frames and any specific partial value is the
+  host's business. It likewise checks the tip holding its material only on the
+  figure. From the floor the grip is still reeling in at `reel_speed` under the
+  solver's soft constraint, so the tip legitimately lags its target there; what
+  is true at that range is that the extended arm has drawn the material inward.
+- Every replay bound is measured against something the same frame window also
+  measures, never against a fitted constant. The tip-holding check bounds the
+  gap by how far the grip itself travelled that frame, because `Octopus.advance`
+  anchors the arm on the grip as it was before the solver ran and the solver
+  then reels that grip onward — the residual is one frame of grip motion, so a
+  fixed length would be a coincidence. Carrying is asserted by sign only: the
+  reel pulls at `reel_speed` 0.7 m/s while the carry point retreats at no more
+  than `move_speed` 0.55 m/s, so the gap can only shrink, but how far it shrinks
+  depends on what the rope drags over. Three earlier attempts to bound these by
+  a fitted figure — a fraction of the hold span, a flat 0.5 m, and a reach
+  clamp that `octopus_play.tscn` pins nothing to trigger — each passed once and
+  then failed, which is why the assertion messages print their own measurements.
 
 No performance or physical-touch acceptance is inferred from the desktop
 replay.

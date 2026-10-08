@@ -46,10 +46,15 @@ func advance(delta: float, intent: Vector3) -> void:
 
 ## Grabs rope along an aim direction. A zero direction takes the nearest visible
 ## material, which is the conventional fallback for an aimless tap.
-func grab(direction: Vector3) -> bool:
+##
+## `view_normal` is the axis the aim direction carries no information about, which
+## for a stick-derived aim is the viewing axis. Passing it keeps the aim cone on
+## the plane the gesture was made on. This stays a direction and an axis rather
+## than a camera, so the octopus still owns no view.
+func grab(direction: Vector3, view_normal := Vector3.ZERO) -> bool:
 	if _grab.is_active():
 		return false
-	if not _grab.grab(get_eye(), direction):
+	if not _grab.grab(get_eye(), direction, view_normal):
 		return false
 	var anchor := _grab.get_position()
 	_arm.reach(get_shoulder(anchor), anchor)
