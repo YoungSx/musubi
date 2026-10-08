@@ -1,9 +1,20 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/octopus/octopus_controls.gd" id="1_controls"]
+[ext_resource type="Script" path="res://scripts/ui/aim_indicator.gd" id="2_aim"]
 
 [node name="OctopusControls" type="CanvasLayer"]
 script = ExtResource("1_controls")
+
+[node name="AimIndicator" type="Control" parent="."]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_aim")
 
 [node name="SafeArea" type="MarginContainer" parent="."]
 unique_name_in_owner = true
@@ -31,7 +42,7 @@ grow_horizontal = 2
 mouse_filter = 2
 theme_type_variation = &"SubtitleLabel"
 horizontal_alignment = 1
-text = "Flick the right stick toward the rope"
+text = "Push the right stick toward the rope, then release"
 
 [node name="MoveStick" type="VirtualJoystick" parent="SafeArea/Layout"]
 unique_name_in_owner = true

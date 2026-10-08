@@ -37,6 +37,7 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_octopus_arm.gd",
 	"res://tests/unit/test_octopus_grab.gd",
 	"res://tests/unit/test_octopus_camera.gd",
+	"res://tests/unit/test_octopus_aim_feedback.gd",
 ]
 
 

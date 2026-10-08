@@ -15,6 +15,9 @@ extends Node3D
 
 var _camera := OctopusCamera.new()
 var _collision := RopeCollision.new()
+## Whether the aim currently has material in reach. Owned here rather than read
+## back out of the indicator, which presents this state and does not define it.
+var _aim_locked := false
 
 
 func _ready() -> void:
@@ -33,6 +36,7 @@ func _process(delta: float) -> void:
 	var intent := SurfaceWalker.camera_intent(OctopusControls.read_move(), camera_rig.get_target_yaw(), octopus.get_up())
 	octopus.advance(delta, intent)
 	_camera.update(delta, octopus.get_position_in_world(), octopus.get_up(), intent)
+	_update_aim()
 	_update_hint()
 
 
@@ -57,11 +61,54 @@ func _grab(aim: Vector2) -> void:
 	# The view axis goes along with the aim: aim_direction spans the view plane,
 	# so the cone has to be measured there too rather than against world depth.
 	var view := camera_rig.get_camera().global_transform.basis
-	octopus.grab(aim_direction(aim, view), view.z)
+	if not octopus.grab(aim_direction(aim, view), view.z) and controls != null:
+		# A miss has to say so. The aim is judged by a cone and a line of sight,
+		# both of which fail silently, and a silent failure is indistinguishable
+		# from a stick that does nothing.
+		controls.notify("Nothing in reach that way")
 	_update_hint()
+
+
+## Draws where the aim currently points, every frame the stick is pushed.
+##
+## The grab decides on release, so without this the player pushes the stick and
+## sees nothing until the gesture is already spent. The preview runs the octopus's
+## own aim query, so the ring marks exactly what releasing would take.
+func _update_aim() -> void:
+	if controls == null:
+		return
+	var stick := OctopusControls.read_aim()
+	var camera := camera_rig.get_camera()
+	# Nothing to preview while holding: a push of this stick releases whatever is
+	# held, whichever way it points, so a target would promise a grab that is not
+	# what the gesture does. Behind the camera there is no screen position to draw
+	# at, and unproject_position does not report that -- it returns a point.
+	if stick.is_zero_approx() or octopus.is_holding() or camera.is_position_behind(octopus.get_eye()):
+		_aim_locked = false
+		controls.clear_aim()
+		return
+	var view := camera.global_transform.basis
+	var origin := camera.unproject_position(octopus.get_eye())
+	var material := octopus.aim_material(aim_direction(stick, view), view.z)
+	var target := octopus.get_material_position(material) if material >= 0.0 else Vector3.ZERO
+	_aim_locked = material >= 0.0 and not camera.is_position_behind(target)
+	if _aim_locked:
+		controls.show_aim_target(origin, camera.unproject_position(target))
+	else:
+		controls.show_aim_search(origin, stick)
 
 
 func _update_hint() -> void:
 	if controls == null:
 		return
-	controls.set_hint("Tap the right stick to let go" if octopus.is_holding() else "Flick the right stick toward the rope")
+	controls.set_hint(_hint_text())
+
+
+## The steady hint. Aiming states come first: while the stick is pushed, what the
+## line has to answer is whether releasing will take anything.
+func _hint_text() -> String:
+	if octopus.is_holding():
+		return "Centre the right stick and release to let go"
+	if OctopusControls.read_aim().is_zero_approx():
+		return "Push the right stick toward the rope, then release"
+	return "Release to grab" if _aim_locked else "Nothing in reach yet · keep sweeping"
