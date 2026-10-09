@@ -103,6 +103,22 @@ func _run() -> void:
 	await _hold_aim(aim, 3)
 	var indicator := mode.controls.get_aim_indicator()
 	_check(indicator.get_state() == AimIndicator.State.LOCKED, "holding the aim stick marks material before any grab")
+	# The ring is on the rope, to within how far that material moves on screen while
+	# the mark is stale. The mode draws the ring from its own _process using a
+	# material position read before Rope._process advanced the simulation, so the
+	# mark is stale by construction and that motion is the floor on any pixel figure
+	# here.
+	#
+	# The bound has to span the same interval the gap does, which is why the
+	# material's projection is sampled before the frame rather than after it. The
+	# rope is falling and accelerating under a held stick, so consecutive frames do
+	# not move it equally: sampling the bound from a later frame than the gap was
+	# taken across is what made the four earlier attempts read just under the gap.
+	# Measured at the marked material rather than over the whole rope, so a whipping
+	# free end cannot buy slack for a misplaced ring.
+	var marked_before := octopus.aim_material(aim_direction_of(aim), view_normal())
+	var projected_before := _project_material(marked_before)
+	await _frames(1)
 	var ring := indicator.get_endpoint()
 	var ring_gap := _screen_distance_to_rope(ring)
 	# Material coordinate, not world position. The claim is that the release takes
@@ -111,14 +127,8 @@ func _run() -> void:
 	# particle and the rope moves between the preview and the lift.
 	var marked_u := octopus.aim_material(aim_direction_of(aim), view_normal())
 	_check(not octopus.is_holding(), "and aiming alone grabs nothing")
-	# The ring is on the rope, to within how far that material moves on screen in a
-	# frame. The mode draws the ring from its own _process while the rope keeps its
-	# fixed-step schedule, so the mark is a frame stale by construction and that
-	# motion is the floor on any pixel figure here. Measured after the two readings
-	# above so they stay in one frame, and at the marked material rather than over
-	# the whole rope, so a whipping free end cannot buy slack for a misplaced ring.
-	var rope_motion := await _rope_screen_motion(ring)
-	_check(ring_gap <= rope_motion, "the ring is drawn on the rope: %.2f px out against %.2f px the material moves per frame" % [ring_gap, rope_motion])
+	var rope_motion := _project_material(marked_before).distance_to(projected_before)
+	_check(ring_gap <= rope_motion, "the ring is drawn on the rope: %.2f px out against %.2f px the material moved over the same frame" % [ring_gap, rope_motion])
 	_lift_aim(aim)
 	await _frames(3)
 	_check(octopus.is_holding(), "an aim-stick release grabs the rope")
@@ -156,26 +166,27 @@ func _run() -> void:
 	_check(octopus.is_holding(), "the grip survives carrying")
 	_check(octopus.get_position_in_world().distance_to(body_start) > 0.1, "the body moved while holding")
 	_check(grip_now.distance_to(grip_start) > 0.05, "the rope was carried along")
-	# The reel is a pursuit loop, not a setpoint: carry() reads the grip's actual
-	# position every frame and asks for that plus one reel step toward the body, so
-	# the target can never run ahead of the material it is pulling. What the stage
-	# can claim, then, is that the reel always asks inward and that the material
-	# tracks what it asks -- not that the material arrives. How far it gets is the
-	# rope's call, and this play scene pins no particle, so nothing clamps the
-	# target either; the resistance is the material's own weight and contacts.
+	# The draw-in finishes, and then the arm asks for the carry point itself rather
+	# than one reel step ahead of wherever the material drifted to. That is the
+	# difference between a held rope and a rubber band: a target derived from the
+	# material can never ask for more than one step of pull, so it trails the body
+	# for as long as it walks.
 	var carry_point := octopus.get_carry_point()
 	var carry_target := simulation.get_drag_target(OctopusGrab.GRIP_ID)
-	_check(carry_target.distance_to(carry_point) < grip_now.distance_to(carry_point),
-		"the reel keeps asking the material inward: target %.4f m from the body against the grip's %.4f m" % [carry_target.distance_to(carry_point), grip_now.distance_to(carry_point)])
-	_check(grip_now.distance_to(carry_target) < grip_now.distance_to(grip_start),
-		"the carried material rides at that target, %.4f m from it after travelling %.4f m" % [grip_now.distance_to(carry_target), grip_now.distance_to(grip_start)])
-	# And it gains ground. The reel pulls at reel_speed while the carry point runs
-	# away at no more than move_speed, and the reel is the faster of the two, so the
-	# gap can only shrink. Only the sign is assertable: how much it shrinks depends
-	# on what the material is dragging over, and the grab can start anywhere the arm
-	# can reach -- 0.48 m to 0.80 m out across runs, closing to 0.07 m to 0.41 m.
-	_check(carry_point.distance_to(grip_now) < carry_point.distance_to(grip_start),
-		"carrying gains ground on the body: %.4f m away, from %.4f m at the grab" % [carry_point.distance_to(grip_now), carry_point.distance_to(grip_start)])
+	_check(octopus.is_carrying_taut(), "the draw-in finished, so the hold is taut")
+	_check(carry_target.distance_to(carry_point) < 0.0001,
+		"the arm asks for the carry point exactly: target %.6f m from the body" % carry_target.distance_to(carry_point))
+	# What is left between the body and its material is the solver's own give at
+	# carry_compliance, and the bound on it is the carry offset the hold is trying
+	# to maintain: a residual comparable to that offset would read as the arm
+	# stretching rather than holding. Measured 0.0011 m to 0.0089 m across runs
+	# against the 0.09 m offset, where the superseded pursuit loop left 0.07 m to
+	# 0.41 m and never arrived at all.
+	var residual := carry_point.distance_to(grip_now)
+	_check(residual < mode.octopus.config.carry_offset * 0.25,
+		"and the material rides there, %.4f m out against the %.2f m carry offset" % [residual, mode.octopus.config.carry_offset])
+	_check(residual < carry_point.distance_to(grip_start),
+		"carrying gains ground on the body: %.4f m away, from %.4f m at the grab" % [residual, carry_point.distance_to(grip_start)])
 	_check(mode.rope.get_simulation().get_max_segment_stretch() < 1.6, "carrying does not tear the rope")
 	await _capture("octopus-carry")
 
@@ -267,17 +278,18 @@ func _screen_distance_to_rope(point: Vector2) -> float:
 	return point.distance_to(_project_point(index))
 
 
-## How far the rope point nearest a canvas position travels on screen over one
-## frame. This is the resolution any ring-to-rope pixel figure can be held to:
-## the material keeps moving after the mark is drawn, so a bound tighter than its
-## own motion is measuring the phase of the frame rather than the placement.
-func _rope_screen_motion(point: Vector2) -> float:
-	var index := _nearest_projected_point(point)
-	if index < 0:
-		return 0.0
-	var before := _project_point(index)
-	await _frames(1)
-	return _project_point(index).distance_to(before)
+## Canvas position of a material coordinate, or a far-off point when it is behind
+## the camera. Projecting the material itself, rather than the nearest vertex to
+## some screen position, keeps a motion measurement attached to one piece of
+## material across frames even as the rope moves past other vertices.
+func _project_material(material_u: float) -> Vector2:
+	if material_u < 0.0:
+		return Vector2.ZERO
+	var camera := mode.camera_rig.get_camera()
+	var world := mode.rope.get_simulation().get_material_position(material_u)
+	if camera.is_position_behind(world):
+		return Vector2.ZERO
+	return camera.unproject_position(world)
 
 
 ## Index of the rope point whose projection is nearest a canvas position, or -1

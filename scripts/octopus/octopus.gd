@@ -39,7 +39,7 @@ func advance(delta: float, intent: Vector3) -> void:
 	_apply_transform()
 	if _grab.is_active():
 		_grab.carry(get_carry_point(), delta)
-		_arm.hold(get_shoulder(_grab.get_position()), _grab.get_position())
+		_arm.hold(get_shoulder(_grab.get_position()), _grab.get_position(), _grab.is_drawn_in())
 	_arm.step(delta)
 	_update_skin()
 
@@ -102,6 +102,12 @@ func get_contact() -> SurfaceWalker.Contact:
 ## How far the reaching arm has stretched, 0 to 1.
 func get_reach_extension() -> float:
 	return _arm.get_extension()
+
+
+## Whether the hold has finished drawing its material in, after which the arm
+## carries it with only the solver's own give.
+func is_carrying_taut() -> bool:
+	return _grab.is_drawn_in()
 
 
 ## Tip of the reaching arm in world space, which is the held material once the
