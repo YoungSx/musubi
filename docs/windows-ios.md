@@ -2,7 +2,44 @@
 
 核查日期：2026-10-07。项目：Godot 4.7.2 / GDScript / Mobile renderer。
 
-## 0.9.4 瞄准反馈（手机上的当前版本）
+## 0.9.4 刚性携带（手机上的当前版本）
+
+- 源码提交 `3649695`，成功构建
+  [37897552655](https://github.com/YoungSx/musubi/actions/runs/37897552655)，2m57s。
+  macOS CI `215 passed, 0 failed`，产物 `Musubi-iPhone-unsigned`（22,071,360 字节）
+  下载后 SHA-256 与 CI 记录的 `50ffa4aa…877fa7` 一致。
+- 这个 IPA 带上了携带手感的修复：拉取阶段仍按 `reel_speed` 限速，到位后锁定并
+  直接要携带点本身，抓握用自己的 `carry_compliance` 而非绳子的手指默认值。
+  原来的追逐式目标永远只在材料前面一步，走多久就拖多久。行为与量到的数字见
+  [章鱼操作说明](octopus-play.md)。
+- **安装要用 `--udid`，不要用 `--usb`。** 手机已解锁、`xtool devices` 也列得出设备
+  的情况下，`install --usb` 仍然在 `[Preparing device]` 报
+  `Operation not permitted` 或 `noDevice`；换成
+  `install --udid <设备udid>` 后同一个包一次走完 Preparing
+  device、Provisioning、Signing、Packaging、Connecting、Installing、Verifying，
+  返回 `Successfully installed!`（exit=0）。解锁手机本身不足以解决，`--usb`
+  在解锁后重试仍然失败，是选择器的差别。udid 用 `xtool devices` 取，
+  本机的那一个写在不进仓库的 `build/ios/Reinstall-Musubi.cmd` 里，已改用 udid。
+- **这次没有套 proxychains shim。** 本机现在直连 Apple 开发者 API 可用：
+  WSL 里 `curl https://developerservices2.apple.com/` 返回 200，
+  `ds teams` / `ds devices` / `ds certificates` / `ds profiles` 在 `LD_PRELOAD`
+  未设置时全部正常返回。反过来，带上 shim 时 `xtool devices` 会报
+  `Operation not permitted`，所以这层 shim 不能一直挂着。下文那段仍然保留：
+  如果 provisioning 再次超时，照着重建，但要记得它会影响 usbmuxd 调用。
+- `xtool launch --udid … XTL-5W6H7M2ZA3.com.youngsx.musubi` 返回
+  `InstallationProxyClient.Error.unknown`（exit=1）。和 0.9.1 条目记的是同一类
+  已知限制，位置更早了一步（之前是 `DebugserverClient.Error.unknown`）。
+  这不是安装失败，但也**不是启动成功，更不是版本号确认**。本机没有装
+  `pymobiledevice3` / `ideviceinstaller`，这次也没有用 Installation Proxy
+  复查应用元数据——为了诊断去装包不在这次范围内。
+- **携带手感在手机上仍未实测。** 桌面 `tools/verify_octopus.gd` 的 390×844
+  渲染回放连跑五次 0 failures、携带残差 0.0011–0.0098 m，这是桌面结论，
+  不代表触屏手感、持续帧率和内存验收。
+- 签名材料状态：证书 `CKB74ADNQ8` 有效至 2027-10-07，profile `2C57C6KW4D`
+  为 `ACTIVE`、2026-10-16 过期，覆盖本机证书与这台设备。免费 provisioning
+  的 profile 只有 7 天，过期后需要重新签名安装。
+
+## 0.9.4 瞄准反馈
 
 - 源码提交 `3885fb6`，成功构建
   [37822096932](https://github.com/YoungSx/musubi/actions/runs/37822096932)。
@@ -21,10 +58,10 @@
   那样用 Installation Proxy 复查应用元数据。
 - **摇杆抓取和瞄准反馈在手机上仍未实测。** 桌面 `tools/verify_octopus.gd`
   的 390×844 渲染回放 0 failures 是桌面结论，不代表触屏手感、持续帧率和内存验收。
-- 本机 `build/ios/Reinstall-Musubi.cmd` 和 `build/ios/apple-login.sh` 已带上
-  proxychains shim 并指向本次产物 `37822096932`，不再是会复现 provisioning
-  超时的裸调用。这两个脚本带机器绝对路径，落在 `.gitignore` 的 `/build/` 下，
-  只存在于本机，不进仓库；换机器要照下文那段重建。
+- 这条记录写下时 `build/ios/Reinstall-Musubi.cmd` 带 proxychains shim、用
+  `--usb` 选择设备、指向产物 `37822096932`。三处都已在 `3649695` 之后改掉，
+  见本文件顶部条目。这两个脚本带机器绝对路径，落在 `.gitignore` 的 `/build/`
+  下，只存在于本机，不进仓库；换机器要照下文那段重建。
 
 ## 0.9.4 章鱼操作
 
@@ -128,12 +165,18 @@ xtool 的自动启动命令在本机返回 InstallationProxy 错误；最终启�
 gh run download 37632979914 -n Musubi-iPhone-unsigned -D build/ios/artifacts/37632979914
 ```
 
-### 本机网络：provisioning 必须走 proxychains shim
+### 本机网络：provisioning 走不通时的 proxychains shim
 
-此机器直连 Apple 开发者 API 超时，代理是唯一出口；而 xtool 用自己的 Swift HTTP
-客户端（AsyncHTTPClient），**不读 `http_proxy` / `https_proxy`**，设这些变量对它无效。
-可行的做法是用户目录下的 proxychains-ng `LD_PRELOAD` shim 钩住 `connect()`，
-不动 `/etc/hosts`、不占 443、不需要 root：
+**先试直连。** 2026-10-09 实测本机直连 Apple 开发者 API 可用，
+`3649695` 的签名安装没有用 shim 就跑通了，判断依据见本文件顶部条目。
+下面这段是直连超时时的退路，不是默认配置——带上 shim 时 `xtool devices`
+会报 `Operation not permitted`，所以它不能一直挂着，只在 provisioning
+真的走不通时临时套上。
+
+退路的由来：此机器曾经直连 Apple 开发者 API 超时，代理是唯一出口；而 xtool 用
+自己的 Swift HTTP 客户端（AsyncHTTPClient），**不读 `http_proxy` / `https_proxy`**，
+设这些变量对它无效。可行的做法是用户目录下的 proxychains-ng `LD_PRELOAD` shim
+钩住 `connect()`，不动 `/etc/hosts`、不占 443、不需要 root：
 
 ```bash
 WORK=$HOME/.local/opt/proxychains
@@ -147,10 +190,16 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
 `proxychains.conf` 的首条 `localnet 127.0.0.0/255.0.0.0` 让 usbmuxd 的
 `127.0.0.1:27015` 保持直连，`[ProxyList]` 里的 `socks5 127.0.0.1 7890`
-只承载 provisioning 流量；两者不能互换。0.9.4 的签名与安装就是这样跑通的。
-本机的 `build/ios/Reinstall-Musubi.cmd` 和 `build/ios/apple-login.sh` 现在都带这层
-shim，不再需要手敲上面这段。`auth login` 走同一条网络，所以两个脚本套的是同一组
-变量。这两个脚本和 proxychains 本身都不在仓库里：脚本带机器绝对路径、落在
+只承载 provisioning 流量；两者不能互换。`3885fb6` 的签名与安装是这样跑通的，
+`3649695` 则是直连跑通的。
+
+即便有 localnet 这一条，实测带 shim 时 `xtool devices` 仍会报
+`Operation not permitted`，所以它只适合在 provisioning 阶段临时套上，
+不要留在安装脚本里。`build/ios/Reinstall-Musubi.cmd` 现在不带 shim；
+`apple-login.sh` 仍带着，因为 `auth login` 走的是同一条 Apple 网络，
+真遇到超时时它是需要的那一个。
+
+这两个脚本和 proxychains 本身都不在仓库里：脚本带机器绝对路径、落在
 `.gitignore` 的 `/build/` 下，proxychains 装在 `$HOME/.local/opt/proxychains` 且不是
 系统包。换机器时按上面这段重建，不要指望从仓库里拿到它们。
 
