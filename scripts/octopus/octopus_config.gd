@@ -27,6 +27,10 @@ extends Resource
 @export_range(0.02, 1.0, 0.01, "suffix:s") var retract_time: float = 0.12
 ## Lateral bow of the stretched arm, as a fraction of its span.
 @export_range(0.0, 0.6, 0.01) var arm_bow: float = 0.22
+## Fraction of `arm_bow` the arm keeps once its hold is taut. The hold is nearly
+## rigid, so the arm should not read as a slack rope; kept above zero so it still
+## reads as tissue rather than a rod.
+@export_range(0.0, 1.0, 0.01) var taut_arm_bow: float = 0.12
 ## Half-angle of the aim cone used to pick a target along the stick direction.
 @export_range(5.0, 90.0, 1.0, "suffix:deg") var aim_cone_degrees: float = 35.0
 
@@ -34,9 +38,18 @@ extends Resource
 ## Distance the grabbed material is held from the body center while carried.
 @export_range(0.02, 0.6, 0.01, "suffix:m") var carry_offset: float = 0.09
 ## Rate at which a distant grabbed point is drawn in toward the carry offset.
-## The rope solver clamps its own grip correction as well, so this is an intent
-## limit rather than a guarantee.
+## This bounds the initial draw-in only: once the hold has closed on the carry
+## point it stops rate limiting, so a far grab reels in instead of teleporting
+## while a settled hold does not keep trailing the body. The rope solver clamps
+## its own grip correction as well, so this is an intent limit rather than a
+## guarantee.
 @export_range(0.05, 3.0, 0.01, "suffix:m/s") var reel_speed: float = 0.7
+## Compliance of the carried grip: inverse stiffness, so smaller is firmer.
+## This is the arm's only give once the rope is drawn in. It overrides the
+## rope's own `drag_compliance`, which is tuned for a fingertip that should
+## yield; an arm clamped onto the rope should not. Kept nonzero so the hold
+## still reads as tissue under load rather than a weld.
+@export_range(0.000001, 0.001, 0.000001) var carry_compliance: float = 0.00002
 
 @export_group("Camera")
 ## Height of the camera focus above the body along its local up axis.

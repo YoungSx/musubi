@@ -3,9 +3,14 @@ extends RefCounted
 ## One rope grip owned by the octopus.
 ##
 ## It addresses the rope through the same begin_grip/update_drag_target/end_drag
-## seam a finger uses, so the solver applies the identical soft positional
+## seam a finger uses, so the solver applies the same kind of positional
 ## constraint, length limits and contacts. Nothing here reaches into the
 ## simulation's internals.
+##
+## Where it differs from a finger is stiffness and intent. The grip runs at
+## `carry_compliance` instead of the rope's fingertip default, and the carry
+## target is the arm's own rather than a step ahead of the material, so the hold
+## reads as an arm clamped onto the rope instead of a rubber band trailing it.
 
 ## Outside the touch-index range InteractionManager assigns, so the two input
 ## schemes can never collide over one grip slot.
@@ -14,6 +19,8 @@ const GRIP_ID := 4096
 var _config: OctopusConfig
 var _rope: Rope
 var _active := false
+var _carry_target := Vector3.ZERO
+var _drawn_in := false
 
 
 func configure(config: OctopusConfig, rope: Rope) -> void:
@@ -93,6 +100,9 @@ func grab(origin: Vector3, direction: Vector3, view_normal := Vector3.ZERO) -> b
 	if not _rope.begin_grip(material_u, GRIP_ID):
 		return false
 	_active = true
+	_carry_target = _rope.get_simulation().get_grip_position(GRIP_ID)
+	_drawn_in = false
+	_rope.get_simulation().set_grip_compliance(GRIP_ID, _config.carry_compliance)
 	return true
 
 
@@ -102,19 +112,55 @@ func get_position() -> Vector3:
 	return _rope.get_simulation().get_grip_position(GRIP_ID)
 
 
-## Draws the held material toward the carry point at a bounded rate. The solver
-## clamps its own correction as well, so a far grab reels in instead of
-## teleporting the rope to the body.
+## Draws the held material in to the carry point, then holds it there.
+##
+## The target is the arm's own, advanced toward the goal at `reel_speed` until it
+## arrives and pinned to the goal from then on. It is deliberately not derived
+## from where the material currently is: a target that is always one step ahead
+## of the material can never ask for more than one step of pull, so the arm would
+## trail the body for as long as it walked, which reads as a rubber band rather
+## than a held rope. Advancing a target of its own separates the two claims --
+## reeling a far grab in takes `distance / reel_speed` whatever the rope does
+## about it, and a hold that has arrived asks for the carry point exactly.
+##
+## Arrival latches for the life of the grip. Walking is slower than reeling, so
+## a settled hold would stay settled either way, but latching means no stick
+## input or surface can put the rate limit back and make the arm elastic again.
+## What give remains is the solver's own, at `carry_compliance`.
 func carry(goal: Vector3, delta: float) -> void:
 	if not _active:
 		return
-	var current := get_position()
-	var step := (goal - current).limit_length(_config.reel_speed * maxf(delta, 0.0))
-	_rope.update_drag_target(current + step, GRIP_ID)
+	if _drawn_in:
+		_carry_target = goal
+	else:
+		var remaining := goal - _carry_target
+		var step := _config.reel_speed * maxf(delta, 0.0)
+		if remaining.length() <= step:
+			_carry_target = goal
+			_drawn_in = true
+		else:
+			_carry_target += remaining.normalized() * step
+	_rope.update_drag_target(_carry_target, GRIP_ID)
+
+
+## Whether the initial draw-in has finished, after which the arm holds the carry
+## point rigidly apart from the solver's own compliance.
+func is_drawn_in() -> bool:
+	return _active and _drawn_in
+
+
+## Where the arm is asking its material to be. This is the arm's ask, before the
+## rope clamps it to what the material can physically reach around its pinned
+## ends, so it is the thing to read when the question is what the arm wants
+## rather than what the rope allowed.
+func get_carry_target() -> Vector3:
+	return _carry_target if _active else Vector3.ZERO
 
 
 func release() -> void:
 	if not _active:
 		return
 	_active = false
+	_drawn_in = false
+	_carry_target = Vector3.ZERO
 	_rope.end_drag(GRIP_ID)

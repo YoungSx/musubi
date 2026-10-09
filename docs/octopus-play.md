@@ -5,6 +5,9 @@ octopus is driven by two virtual sticks: the left one walks it over the floor
 and up the mannequin, the right one aims an elastic arm at the rope and grabs
 on release. Carrying the rope is just walking while holding it.
 
+The arm is elastic while it reaches and nearly rigid once it has drawn its
+material in: the stretch is the grab, not the carry.
+
 This replaces direct rope touching as the play scheme. `play.tscn` and
 `main.tscn` are untouched, so the touch-drag mode, its HUD and its tests still
 run as before.
@@ -69,9 +72,34 @@ left, and answering it from the single release event leaves no lift unanswered.
   anchor exactly so the drawn arm stays attached.
 - The grip goes through the same `begin_grip` / `update_drag_target` /
   `end_drag` seam a finger uses, at a grip id outside the touch-index range.
-  The solver applies the identical soft constraint, length limits and contacts;
-  carrying reels the material toward the body at a bounded rate rather than
-  teleporting it.
+  The solver applies the same kind of positional constraint, length limits and
+  contacts.
+- Carrying has two phases, and they are different mechanisms. The draw-in
+  advances the arm's own target toward the carry point at `reel_speed`, so a far
+  grab reels in over `distance / reel_speed` instead of teleporting. Once that
+  target arrives it latches for the life of the grip and the arm asks for the
+  carry point exactly.
+- The latch is what makes the hold read as an arm rather than a rubber band.
+  Until `0c2bdec` the target was derived from where the material currently was,
+  one reel step ahead of it — a pursuit loop, which can never ask for more than
+  one step of pull however far behind the material falls. Walking therefore
+  stretched the arm for as long as the player walked, and on the play scene's
+  unpinned rope the material never arrived at all: measured 0.07 m to 0.41 m
+  behind the body across runs, and 0.82 m over a two-second walk in isolation.
+  The arm's own target cannot fall behind, so the draw-in completes and stays
+  complete.
+- The grip runs at `carry_compliance`, not the rope's `drag_compliance`. Those
+  are different physical claims and the rope holds both at once, per grip: a
+  fingertip pushing rope around should yield, and an arm clamped onto it should
+  not. Globally stiffening the rope would have retuned the touch scheme that
+  `0.9.3` shipped. What give remains is this compliance alone — 1 mm to 10 mm at
+  walking speed against the 0.09 m carry offset, which is deliberate so the hold
+  reads as tissue under load rather than a weld. The setpoint alone leaves
+  0.39 m at fingertip softness, so both halves are load-bearing.
+- The drawn arm follows the same distinction: the bow relaxes while reaching and
+  flattens to `taut_arm_bow` once the hold is taut, because a nearly rigid hold
+  drawn as a slack curve contradicts itself. It stays above zero for the same
+  reason the compliance does.
 - The camera follows without any gesture. It frames the body along its current
   surface normal, eases its yaw behind sustained movement under a rate limit
   with a dead zone, and dollies in when its own origin would sit inside
@@ -176,8 +204,9 @@ this exact build, 4.7.2-stable `ed1daf0bf`.
   material inward; stick-driven walking; climbing until rope is in sight with a
   tilted frame and positive clearance; a grab from the figure claiming exactly
   one grip with the extended tip holding its material; carrying — the grip
-  surviving, the reel still asking the material inward, the material riding at
-  what it asks, ground gained on the body, and the rope not tearing; a centred
+  surviving, the draw-in having finished, the arm asking for the carry point
+  exactly, the material riding there within a quarter of the carry offset,
+  ground gained on the body, and the rope not tearing; a centred
   release with the rope still simulating; and camera framing and clearance.
   Captures `octopus-start`, `octopus-reach`, `octopus-climb`, `octopus-grab`,
   `octopus-carry`, `octopus-release`.
@@ -195,31 +224,41 @@ this exact build, 4.7.2-stable `ed1daf0bf`.
   step advances extension by `delta / reach_time`, so at the replay's frame rate
   the arm saturates within a few frames and any specific partial value is the
   host's business. It likewise checks the tip holding its material only on the
-  figure. From the floor the grip is still reeling in at `reel_speed` under the
-  solver's soft constraint, so the tip legitimately lags its target there; what
-  is true at that range is that the extended arm has drawn the material inward.
+  figure. From the floor the draw-in is still running at `reel_speed`, so the tip
+  legitimately lags its target there; what is true at that range is that the
+  extended arm has drawn the material inward.
 - Every replay bound is measured against something the same frame window also
   measures, never against a fitted constant. The tip-holding check bounds the
   gap by how far the grip itself travelled that frame, because `Octopus.advance`
   anchors the arm on the grip as it was before the solver ran and the solver
   then reels that grip onward — the residual is one frame of grip motion, so a
-  fixed length would be a coincidence. Carrying is asserted by sign only: the
-  reel pulls at `reel_speed` 0.7 m/s while the carry point retreats at no more
-  than `move_speed` 0.55 m/s, so the gap can only shrink, but how far it shrinks
-  depends on what the rope drags over. The ring check is bounded the same way, by
+  fixed length would be a coincidence. Carrying is bounded by the carry offset
+  the hold is trying to maintain, since a residual comparable to that offset
+  would read as the arm stretching rather than holding; it measured 0.0011 m to
+  0.0098 m across runs against the 0.09 m offset. The ring check is bounded by
   how far the marked material itself moves on screen in a frame: the mode draws
-  the ring from its own `_process` while the rope keeps its fixed-step schedule,
-  so the mark is a frame stale by construction and that motion is the floor on
-  any pixel figure. It is measured at the marked material rather than over the
-  whole rope, so a whipping free end cannot buy slack for a misplaced ring, and
-  after the ring and material readings so all three stay in one frame. Four
-  earlier attempts to bound these by a fitted figure — a fraction of the hold
-  span, a flat 0.5 m, a reach clamp that `octopus_play.tscn` pins nothing to
-  trigger, and a flat 1.0 px on the ring — each passed once and then failed,
-  which is why the assertion messages print their own measurements. The ring
-  bound is the clearest case: the gap read 1.13 px against the fitted 1.0 px,
-  then 6.72 px on the next run while its self-measured bound moved with it to
-  7.45 px. The figure was frame phase all along, which no constant can track.
+  the ring from its own `_process` using a material position read before
+  `Rope._process` advanced the simulation, so the mark is stale by construction
+  and that motion is the floor on any pixel figure. It is measured at the marked
+  material rather than over the whole rope, so a whipping free end cannot buy
+  slack for a misplaced ring.
+- Four earlier attempts to bound these by a fitted figure — a fraction of the
+  hold span, a flat 0.5 m, a reach clamp that `octopus_play.tscn` pins nothing
+  to trigger, and a flat 1.0 px on the ring — each passed once and then failed,
+  which is why the assertion messages print their own measurements.
+- The ring bound then failed a fifth time, self-measured, and the cause was the
+  interval rather than the figure. It sampled the material's motion over the
+  frame *after* the gap was read, and the rope is falling and accelerating under
+  a held stick, so consecutive frames do not move it equally: a later frame that
+  moved less than the one the gap spanned reads as a gap exceeding its own bound.
+  It did, at 1.13 px against 1.0 px fitted, then 6.72 against 7.45, then 2.32
+  against 2.01 and 3.67 against 3.29 on unmodified `main`. Sampling the
+  projection before the frame and comparing across that same frame makes the two
+  figures identical — 4.24/4.24, 4.51/4.51, 4.21/4.21, 4.69/4.69 across runs —
+  which is the actual claim: the gap *is* one frame of staleness, not merely
+  smaller than some bound. Widening the window to two frames was tried first and
+  rejected: it raised the bound and kept failing at the same ratio, which is
+  fitting by another name.
 
 No performance or physical-touch acceptance is inferred from the desktop
 replay.
