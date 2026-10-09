@@ -37,6 +37,10 @@ class TouchGrip:
 	var fraction: float
 	var target: Vector3
 	var multiplier := Vector3.ZERO
+	## Negative means "use RopeConfig.drag_compliance". A grip that holds the rope
+	## more firmly than a fingertip does says so here rather than stiffening every
+	## grip in the rope.
+	var compliance := -1.0
 
 var _touch_grips: Dictionary[int, TouchGrip] = {}
 
@@ -199,6 +203,28 @@ func get_grip_count() -> int:
 	return _touch_grips.size() + (1 if _drag_index >= 0 else 0)
 
 
+## Sets how softly one grip pulls its material, overriding the rope-wide
+## `drag_compliance` for that grip alone. A negative value restores the default.
+##
+## A fingertip pushing rope around and a limb clamped onto it are different
+## physical claims, and the rope has to be able to hold both at once: the touch
+## scheme wants a grip that yields, while a carried grip wants one that barely
+## does. Per grip rather than per rope, so neither has to be tuned around the
+## other. Compliance is inverse stiffness, so smaller is firmer.
+func set_grip_compliance(grip_id: int, compliance: float) -> bool:
+	if not _touch_grips.has(grip_id) or not is_finite(compliance):
+		return false
+	_touch_grips[grip_id].compliance = compliance
+	return true
+
+
+func get_grip_compliance(grip_id: int) -> float:
+	if not _touch_grips.has(grip_id):
+		return -1.0
+	var grip := _touch_grips[grip_id]
+	return grip.compliance if grip.compliance >= 0.0 else _config.drag_compliance
+
+
 func begin_support(u: float) -> bool:
 	if _support_index >= 0 or not is_finite(u) or u < 0 or u > 1:
 		return false
@@ -317,7 +343,7 @@ func _solve_drag(dt: float) -> void:
 	if _drag_index >= 0:
 		_drag_lambda = _solve_grip(_drag_index, _drag_fraction, _drag_target, _drag_lambda, dt)
 	for grip: TouchGrip in _touch_grips.values():
-		grip.multiplier = _solve_grip(grip.index, grip.fraction, grip.target, grip.multiplier, dt)
+		grip.multiplier = _solve_grip(grip.index, grip.fraction, grip.target, grip.multiplier, dt, grip.compliance)
 
 func set_transport_targets(targets: PackedVector3Array, grip_id := -1) -> bool:
 	if not targets.is_empty() and (targets.size() != _positions.size() or get_drag_index(grip_id) < 0): return false
@@ -332,8 +358,8 @@ func has_transport_targets() -> bool:
 	return not _transport_targets.is_empty()
 
 
-func _solve_grip(index: int, fraction: float, target: Vector3, multiplier: Vector3, dt: float) -> Vector3:
-	var alpha := _config.drag_compliance / (dt * dt)
+func _solve_grip(index: int, fraction: float, target: Vector3, multiplier: Vector3, dt: float, compliance := -1.0) -> Vector3:
+	var alpha := (compliance if compliance >= 0.0 else _config.drag_compliance) / (dt * dt)
 	var other := mini(index + 1, _positions.size() - 1)
 	var a := 1.0 - fraction
 	var b := fraction

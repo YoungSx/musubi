@@ -15,6 +15,8 @@ stick walks it across the floor and up the mannequin, clinging to any surface.
 The right stick flicks an elastic arm out to grab the rope and taps to let go;
 with the rope held, walking carries it anywhere. The arm has no length limit,
 so it stretches out to its target instead of requiring the body to be adjacent.
+It is elastic while it reaches and nearly rigid once it has drawn the rope in,
+so carrying reads as a limb holding the rope rather than a band trailing it.
 
 Adhesion reuses the rope's own signed-distance geometry, the grip reuses the
 same rope seam a finger uses, both sticks are the engine's `VirtualJoystick`,
