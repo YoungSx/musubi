@@ -80,10 +80,10 @@ static func pick(rope: Rope, origin: Vector3, direction: Vector3, cone_cosine: f
 static func _within_cone(offset: Vector3, aim: Vector3, view_normal: Vector3, cone_cosine: float) -> bool:
 	if view_normal == Vector3.ZERO:
 		return offset.dot(aim) / offset.length() >= cone_cosine
-	var planar := offset - view_normal * offset.dot(view_normal)
+	var planar := offset.slide(view_normal)
 	if planar.length_squared() <= 1e-8:
 		return true
-	var planar_aim := aim - view_normal * aim.dot(view_normal)
+	var planar_aim := aim.slide(view_normal)
 	if planar_aim.length_squared() <= 1e-8:
 		return true
 	return planar.normalized().dot(planar_aim.normalized()) >= cone_cosine

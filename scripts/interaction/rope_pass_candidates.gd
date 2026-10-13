@@ -114,7 +114,7 @@ func _portal_at(loop: Dictionary, slot: int, fraction: float, points: PackedVect
 	if slot > 0:
 		var boundary: PackedVector3Array = loop.boundary
 		var offset: Vector3 = (boundary[floori(float(slot - 1) * boundary.size() / 8.0)] - center) * fraction
-		center += offset - loop.normal * offset.dot(loop.normal)
+		center += offset.slide(loop.normal)
 	if not contains_clear_point(loop, center, radius) or not corridor_clear(points, radius, center, loop.normal, loop.half_length, collision, endpoint):
 		return {}
 	var result := loop.duplicate()
@@ -140,11 +140,11 @@ static func contains_clear_point(aperture: Dictionary, point: Vector3, radius: f
 	var offset: Vector3 = point - aperture.origin
 	if not Geometry2D.is_point_in_polygon(Vector2(offset.dot(aperture.axis_x), offset.dot(aperture.axis_y)), aperture.polygon):
 		return false
-	var projected: Vector3 = point - aperture.normal * offset.dot(aperture.normal)
+	var projected: Vector3 = aperture.origin + offset.slide(aperture.normal)
 	var boundary: PackedVector3Array = aperture.boundary
 	for k in boundary.size():
-		var pair := RopeGeometry.closest_segment_points(projected, projected, boundary[k], boundary[(k + 1) % boundary.size()])
-		if pair[0].distance_to(pair[1]) < radius * 2.0:
+		var closest := Geometry3D.get_closest_point_to_segment(projected, boundary[k], boundary[(k + 1) % boundary.size()])
+		if projected.distance_to(closest) < radius * 2.0:
 			return false
 	return true
 
