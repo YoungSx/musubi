@@ -26,9 +26,9 @@ extends Resource
 @export_group("Assisted follow")
 ## Normalized screen region reserved for precise manipulation without reframing.
 @export var follow_safe_region := Rect2(0.20, 0.20, 0.60, 0.60)
-@export var follow_focus_speed := 0.9
-@export var follow_distance_speed := 1.2
-@export var follow_turn_speed_degrees := 35.0
-@export var follow_occlusion_delay := 0.25
-@export var follow_settle_time := 0.45
-@export var follow_manual_cooldown := 0.35
+@export_range(0.0, 10.0, 0.1, "suffix:m/s") var follow_focus_speed: float = 0.9
+@export_range(0.0, 10.0, 0.1, "suffix:m/s") var follow_distance_speed: float = 1.2
+@export_range(0.0, 360.0, 1.0, "suffix:deg/s") var follow_turn_speed_degrees: float = 35.0
+@export_range(0.0, 5.0, 0.05, "suffix:s") var follow_occlusion_delay: float = 0.25
+@export_range(0.0, 5.0, 0.05, "suffix:s") var follow_settle_time: float = 0.45
+@export_range(0.0, 5.0, 0.05, "suffix:s") var follow_manual_cooldown: float = 0.35
