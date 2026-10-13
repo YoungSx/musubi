@@ -218,7 +218,7 @@ class OrbitState:
 		focus = other.focus
 
 	func approach(other: OrbitState, weight: float) -> void:
-		yaw = lerpf(yaw, other.yaw, weight)
+		yaw = lerp_angle(yaw, other.yaw, weight)
 		pitch = lerpf(pitch, other.pitch, weight)
 		distance = lerpf(distance, other.distance, weight)
 		focus = focus.lerp(other.focus, weight)

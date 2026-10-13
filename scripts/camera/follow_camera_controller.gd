@@ -107,11 +107,15 @@ func update(delta: float, rig: CameraRig, grips: Dictionary[int, Vector3],
 	if _occlusion_time >= config.follow_occlusion_delay:
 		if is_nan(_avoid_yaw) or (visibility_due and absf(wrapf(_avoid_yaw - yaw, -PI, PI)) < 0.02):
 			_avoid_yaw = _choose_visible_yaw(rig, grips, collision)
-		yaw += clampf(wrapf(_avoid_yaw - yaw, -PI, PI), -deg_to_rad(config.follow_turn_speed_degrees) * delta, deg_to_rad(config.follow_turn_speed_degrees) * delta)
+		var max_turn := deg_to_rad(config.follow_turn_speed_degrees) * delta
+		var smoothed_yaw := lerp_angle(yaw, _avoid_yaw, 1.0 - exp(-config.follow_turn_speed_degrees * 0.1 * delta))
+		yaw += clampf(wrapf(smoothed_yaw - yaw, -PI, PI), -max_turn, max_turn)
 	elif overflow and _travel > 0.08 and _heading.length() > 0.5:
 		# A trailing view is a gentle preference, subordinate to framing/visibility.
 		var behind := atan2(-_heading.x, -_heading.z)
-		yaw += clampf(wrapf(behind - yaw, -PI, PI), -deg_to_rad(config.follow_turn_speed_degrees * 0.4) * delta, deg_to_rad(config.follow_turn_speed_degrees * 0.4) * delta)
+		var max_turn := deg_to_rad(config.follow_turn_speed_degrees * 0.4) * delta
+		var smoothed_yaw := lerp_angle(yaw, behind, 1.0 - exp(-config.follow_turn_speed_degrees * 0.08 * delta))
+		yaw += clampf(wrapf(smoothed_yaw - yaw, -PI, PI), -max_turn, max_turn)
 	focus = config.focus + (focus - config.focus).limit_length(config.max_focus_offset)
 	var next_view := rig.global_transform * CameraRig.compute_camera_transform(yaw, rig.get_target_pitch(), distance, focus)
 	if collision == null or collision.get_clearance(next_view.origin) >= 0.08:

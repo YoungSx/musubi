@@ -33,6 +33,5 @@ static func over_target(point: Vector3,points: PackedVector3Array,u: float,radiu
 	if not collision.is_body_segment_clear(point,lifted,radius): return point
 	return lifted
 
-static func _closest(point: Vector3,a: Vector3,b: Vector3) -> Vector3:
-	var edge := b-a
-	return a+edge*clampf((point-a).dot(edge)/maxf(edge.length_squared(),1e-12),0,1)
+static func _closest(point: Vector3, a: Vector3, b: Vector3) -> Vector3:
+	return Geometry3D.get_closest_point_to_segment(point, a, b)
