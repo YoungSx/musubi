@@ -49,5 +49,18 @@ func test_orbit_changes_yaw() -> void:
 	assert_true(not is_equal_approx(rig.get_target_yaw(), before), "yaw changed")
 
 
+func test_approach_interpolates_shortest_angular_arc_across_pi_boundary() -> void:
+	var s1 := CameraRig.OrbitState.new()
+	var s2 := CameraRig.OrbitState.new()
+	# Current yaw is +175 degrees (3.054 rad), target is -175 degrees (-3.054 rad).
+	# Shortest arc difference is only 10 degrees (0.1745 rad).
+	# With ordinary lerpf, it would interpolate backwards through 0 over 350 degrees!
+	s1.yaw = deg_to_rad(175.0)
+	s2.yaw = deg_to_rad(-175.0)
+	s1.approach(s2, 0.5)
+	# At weight 0.5, shortest path passes through +-180 degrees (PI).
+	assert_near(absf(s1.yaw), PI, "yaw interpolates along shortest arc across +-PI", 0.01)
+
+
 func _make_rig() -> CameraRig:
 	return add_to_tree(CameraRigScene.instantiate()) as CameraRig
