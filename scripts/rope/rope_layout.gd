@@ -19,7 +19,7 @@ static func hanging(a: Vector3, b: Vector3, length: float, segment_count: int) -
 	if span_length >= length:
 		return straight(a, span_dir, length, segment_count)
 
-	var sag_dir := Vector3.DOWN - span_dir * Vector3.DOWN.dot(span_dir)
+	var sag_dir := Vector3.DOWN.slide(span_dir)
 	if sag_dir.length_squared() < 1e-8:
 		sag_dir = span_dir.cross(Vector3.RIGHT)
 		if sag_dir.length_squared() < 1e-8:

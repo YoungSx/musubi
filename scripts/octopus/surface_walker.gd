@@ -212,7 +212,7 @@ static func camera_intent(stick: Vector2, yaw: float, surface_up: Vector3) -> Ve
 ## zero when the vector is parallel to it. Shared by the skin and camera so the
 ## surface frame is derived in exactly one place.
 static func tangent(vector: Vector3, normal: Vector3) -> Vector3:
-	var flat := vector - normal * vector.dot(normal)
+	var flat := vector.slide(normal)
 	if flat.length_squared() < 1e-12:
 		return Vector3.ZERO
 	return flat.normalized()

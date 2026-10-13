@@ -245,6 +245,6 @@ static func apply_contact(positions: PackedVector3Array, previous: PackedVector3
 	var velocity := positions[index] - previous[index]
 	var normal := push.normalized()
 	var normal_speed := velocity.dot(normal)
-	var tangent := velocity - normal * normal_speed
+	var tangent := velocity.slide(normal)
 	positions[index] += push
 	previous[index] = positions[index] - normal * maxf(normal_speed, 0.0) - tangent * (1.0 - friction)
