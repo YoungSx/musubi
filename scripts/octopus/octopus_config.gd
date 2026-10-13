@@ -58,6 +58,14 @@ extends Resource
 @export_range(0.0, 360.0, 1.0, "suffix:deg/s") var follow_turn_speed_degrees: float = 90.0
 ## Stick magnitude below which the view holds its current yaw.
 @export_range(0.0, 1.0, 0.01) var follow_turn_threshold: float = 0.4
+## Exponential decay damping factor for smooth yaw easing using lerp_angle.
+@export_range(0.5, 20.0, 0.1) var follow_turn_damping: float = 6.0
+## Seconds of consistent directional movement required before the camera eases behind sideways/turning movement.
+@export_range(0.0, 1.0, 0.01, "suffix:s") var follow_turn_delay: float = 0.2
+## Forward look-ahead distance along movement direction (meters).
+@export_range(0.0, 0.5, 0.01, "suffix:m") var follow_look_ahead: float = 0.08
+## Rate at which distance springs back after being pushed in by collision (m/s).
+@export_range(0.5, 20.0, 0.5, "suffix:m/s") var follow_distance_recovery_speed: float = 3.0
 
 
 func get_reach_distance() -> float:
