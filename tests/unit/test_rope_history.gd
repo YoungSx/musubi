@@ -62,6 +62,14 @@ func test_shortcuts_map_undo_and_redo() -> void:
 	assert_eq(DesktopShortcuts.action_for_key(key), &"redo", "Ctrl Y")
 
 
+func test_shortcuts_register_input_map() -> void:
+	DesktopShortcuts.register_input_map()
+	assert_true(InputMap.has_action(&"undo"), "InputMap has undo")
+	assert_true(InputMap.has_action(&"redo"), "InputMap has redo")
+	assert_true(InputMap.has_action(&"reset"), "InputMap has reset")
+	assert_true(not InputMap.action_get_events(&"undo").is_empty(), "undo has registered events")
+
+
 func test_reset_undo_restores_obstacles_but_keeps_current_view() -> void:
 	var app := _app()
 	app.mannequin.position = Vector3(0.1, 0.05, 0.1)

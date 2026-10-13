@@ -97,8 +97,6 @@ static func _register_action(action: StringName, events: Array[InputEventKey]) -
 static func _make_key(key: Key, ctrl := false, shift := false) -> InputEventKey:
 	var ev := InputEventKey.new()
 	ev.physical_keycode = key
-	ev.keycode = key
-	ev.ctrl_pressed = ctrl
+	ev.command_or_control_autoremap = ctrl
 	ev.shift_pressed = shift
-	ev.pressed = true
 	return ev
