@@ -1,8 +1,57 @@
 # Windows 上的 iOS 构建路线核查
 
-核查日期：2026-10-07。项目：Godot 4.7.2 / GDScript / Mobile renderer。
+核查日期：2026-10-15。项目：Godot 4.7.2 / GDScript / Mobile renderer。
 
-## 0.9.4 刚性携带（手机上的当前版本）
+## 0.9.4 原生化重构（手机上的当前版本）
+
+- 源码提交 `3b7eacc`，成功构建
+  [38737321529](https://github.com/YoungSx/musubi/actions/runs/38737321529)，2m35s。
+  macOS CI `224 passed, 0 failed`，产物 `Musubi-iPhone-unsigned`（22,075,075 字节）
+  下载后 SHA-256 与 CI 记录的 `7aef84bb…3bd320f` 一致。
+- 这 18 个提交把手写几何数学、跟随镜头和输入映射换成 Godot 原生能力
+  （`Vector3.slide`、`Geometry3D`、InputMap autoremap），见下面各版本条目
+  对应的行为差异。逐条提交：
+  `66af1a8` 跟随镜头、`ffe9ded` 自造轮子、`fe5cd82` 评审意见、`3b7eacc` 几何数学。
+- **安装用 `--udid`，首次 409 是每周复发的常态，直接重跑即可。** 本次第一次
+  `install --udid` 在 `[Provisioning] 66%` 报
+  `conflict(... ProfilesCreateInstance.Output.Conflict ... 409 ENTITY_ERROR
+  "There are no current IOS devices on this team matching the provided device IDs.")`，
+  退出码 1。**这不是配置故障**：免费 provisioning 的设备注册只有 7 天，
+  过期后 Apple 侧就没有这台设备了。同一台机器、同一套材料立刻重跑，第二次
+  一次走完 Provisioning、Signing、Packaging、Connecting、Installing、Verifying，
+  返回 `Successfully installed!`（exit=0）。诊断时先用 `xtool auth status`
+  （本机返回 `Logged in`，token 至 2027-10-07）和 `xtool ds certificates list`
+  （`CKB74ADNQ8` 至 2027-10-07）确认材料完好——两者都正常就说明只是
+  注册过期，重跑即可，不要去动认证或证书。
+- 安装后 `xtool ds profiles list` / `ds devices list` 都能查到东西，与失败时
+  的空输出正好相反：profile `SBR2K4426F` 为 `ACTIVE`，覆盖证书
+  `7CC3489D82D4F217211230D92BCFB97C` 与设备 `00008130-000E1D222EC0001C`，
+  **2026-10-22 过期**；设备 `SLBUY4DGTK`（SX iPhone 15 Pro）为 `ENABLED`，
+  added 2026-10-15。**下周同一条命令会再撞一次 409，这是免费 provisioning
+  的 7 天周期，不是回归。**
+- **推送触发分支要走 HTTPS + 代理，SSH 推不上去。** 本机 remote 是
+  `git@github.com:YoungSx/musubi.git`，`ssh -T git@github.com` 返回
+  `Connection closed by UNKNOWN port 65535`，`ProxyCommand` 走
+  `connect -H/-S 127.0.0.1:7890` 同样失败；直连 `curl https://github.com`
+  返回 000，而 `curl --proxy socks5h://127.0.0.1:7890 https://github.com`
+  返回 200。可用的推送方式：
+
+  ```powershell
+  git -c http.proxy=socks5h://127.0.0.1:7890 push --force-with-lease=build/iphone-install:<last-known-sha> https://github.com/YoungSx/musubi.git build/iphone-install
+  ```
+
+  `<last-known-sha>` 填上一次已知的远端该分支提交（先 `git ls-remote` 拿），
+  这条命令用一次性的 `http.proxy` 覆盖推送，不改动仓库配置或 remote。
+- 触发分支 `build/iphone-install` 的提交范围与 `main` 相同
+  （`git cherry main build/iphone-install` 确认补丁等价），
+  所以本地回到 `main` 再强推是无损更新，不会漏掉 main 上的提交。
+- 本次仍未套 proxychains shim（直连可用，判断依据见 0.9.4 刚性携带条目）。
+  `xtool launch` 本次未再调用；上一版记的
+  `InstallationProxyClient.Error.unknown` 仍是已知限制，不构成启动成功或版本确认。
+- **触屏手感、持续帧率、内存在本次手机上仍未实测。** CI 的 `224 passed` 是
+  headless 测试结果，不代表真机交互验收。
+
+## 0.9.4 刚性携带
 
 - 源码提交 `3649695`，成功构建
   [37897552655](https://github.com/YoungSx/musubi/actions/runs/37897552655)，2m57s。
