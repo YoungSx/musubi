@@ -1,10 +1,10 @@
 class_name OctopusSkin
 extends MultiMeshInstance3D
-## Draws every arm as one tapering bead chain in a single MultiMesh.
+## Draws the dynamic reaching arm when extending/holding rope, while the
+## mascot's integrated 3D model displays the resting tentacle feet.
 ##
 ## Presentation only: it holds no simulation state and never decides anything.
-## Reusing MultiMesh keeps all arms in one draw call on mobile and avoids a
-## second tube-mesh builder alongside the rope's.
+## Reusing MultiMesh keeps arm draw calls minimal.
 
 ## World-space instance transforms; the body transform arrives as a parameter.
 @export var top_level_arms := true
@@ -26,32 +26,33 @@ func _process(delta: float) -> void:
 	_time += delta
 
 
-## The reaching arm follows the supplied curve; the rest idle around the body.
+## The reaching arm follows the supplied curve; resting arms are tucked
+## away so the mascot model's integrated tentacle feet are cleanly shown.
 func update_arms(body: Transform3D, reach_curve: PackedVector3Array) -> void:
 	if _config == null or multimesh == null:
 		return
 	var beads := _config.arm_beads
+	var is_reaching := (reach_curve.size() == beads)
 	for arm in _config.arm_count:
-		var curve := reach_curve if arm == 0 and reach_curve.size() == beads else idle_curve(body, arm, _config, _time)
-		for bead in beads:
-			var t := float(bead) / float(maxi(beads - 1, 1))
-			# Strong taper: a chain of equal beads reads as a string of pearls, so
-			# the root stays thick and the tip nearly vanishes.
-			var radius := _config.mantle_radius * lerpf(0.5, 0.06, t * t)
-			multimesh.set_instance_transform(arm * beads + bead, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * radius), curve[bead]))
+		if arm == 0 and is_reaching:
+			for bead in beads:
+				var t := float(bead) / float(maxi(beads - 1, 1))
+				var radius := _config.mantle_radius * lerpf(0.32, 0.06, t * t)
+				multimesh.set_instance_transform(
+					bead,
+					Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * radius), reach_curve[bead])
+				)
+		else:
+			for bead in beads:
+				multimesh.set_instance_transform(
+					arm * beads + bead,
+					Transform3D(Basis.IDENTITY.scaled(Vector3.ZERO), body.origin)
+				)
 
 
-## Relaxed arm fanned out around the mantle, with a slow phase-offset curl so a
-## resting octopus is not rigid.
-##
-## The fan is biased behind the body and the arms curl back down onto the
-## surface, which reads as an octopus. Spacing them evenly on a flat tangent
-## plane instead draws a radial star: the arms are several times longer than the
-## body's clearance, so they have to bend to stay on the surface they cling to.
 static func idle_curve(body: Transform3D, arm: int, config: OctopusConfig, time: float) -> PackedVector3Array:
 	var beads := config.arm_beads
 	var count := maxi(config.arm_count, 1)
-	# Sweep the fan to the rear: -Z is facing, so the arms trail the walk.
 	var angle := PI + TAU * (float(arm) + 0.5) / float(count) * 0.78
 	var outward := (body.basis.x * sin(angle) - body.basis.z * cos(angle)).normalized()
 	var phase := sin(time * 1.7 + float(arm) * 1.9)
@@ -62,8 +63,6 @@ static func idle_curve(body: Transform3D, arm: int, config: OctopusConfig, time:
 	for bead in beads:
 		var t := float(bead) / float(maxi(beads - 1, 1))
 		var span := config.mantle_radius * 0.5 + length * t
-		# The tip bends toward the surface and then flicks up, so the arm has a
-		# silhouette instead of lying straight out.
 		var droop := config.body_radius * (2.4 * t * t - 0.5 * t) * (1.0 + 0.3 * phase)
 		var side := body.basis.y.cross(outward) * (span * curl * t)
 		points[bead] = body.origin + outward * span + side - body.basis.y * droop
@@ -74,6 +73,6 @@ static func _bead_mesh() -> SphereMesh:
 	var mesh := SphereMesh.new()
 	mesh.radius = 1.0
 	mesh.height = 2.0
-	mesh.radial_segments = 8
-	mesh.rings = 4
+	mesh.radial_segments = 16
+	mesh.rings = 8
 	return mesh

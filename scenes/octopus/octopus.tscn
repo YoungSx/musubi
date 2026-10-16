@@ -17,3 +17,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.022, 0)
 [node name="Arms" type="MultiMeshInstance3D" parent="."]
 material_override = ExtResource("4_material")
 script = ExtResource("3_skin")
+
+[node name="FaceLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, -0.12)
+light_color = Color(1, 0.96, 0.92, 1)
+light_energy = 1.6
+omni_range = 0.8
+omni_attenuation = 1.0
