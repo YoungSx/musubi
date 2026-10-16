@@ -3,12 +3,14 @@
 [ext_resource type="Script" path="res://scripts/octopus/octopus_mode.gd" id="1_mode"]
 [ext_resource type="PackedScene" path="res://scenes/environment/studio.tscn" id="2_studio"]
 [ext_resource type="PackedScene" path="res://scenes/mannequin/mannequin.tscn" id="3_mannequin"]
-[ext_resource type="PackedScene" path="res://scenes/rope/rope.tscn" id="4_rope"]
-[ext_resource type="Resource" path="res://data/rope/play_rope.tres" id="5_rope_config"]
-[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="6_camera"]
-[ext_resource type="Resource" path="res://data/camera/octopus_camera.tres" id="7_camera_config"]
-[ext_resource type="PackedScene" path="res://scenes/octopus/octopus.tscn" id="8_octopus"]
-[ext_resource type="PackedScene" path="res://scenes/ui/octopus_controls.tscn" id="9_controls"]
+[ext_resource type="Resource" path="res://data/mannequin/marble_bust.tres" id="4_bust_config"]
+[ext_resource type="PackedScene" path="res://assets/models/marble_bust_01/marble_bust_01_2k.gltf" id="5_bust_model"]
+[ext_resource type="PackedScene" path="res://scenes/rope/rope.tscn" id="6_rope"]
+[ext_resource type="Resource" path="res://data/rope/play_rope.tres" id="7_rope_config"]
+[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="8_camera"]
+[ext_resource type="Resource" path="res://data/camera/octopus_camera.tres" id="9_camera_config"]
+[ext_resource type="PackedScene" path="res://scenes/octopus/octopus.tscn" id="10_octopus"]
+[ext_resource type="PackedScene" path="res://scenes/ui/octopus_controls.tscn" id="11_controls"]
 
 [node name="OctopusPlay" type="Node3D" node_paths=PackedStringArray("camera_rig", "mannequin", "rope", "octopus", "controls")]
 script = ExtResource("1_mode")
@@ -21,16 +23,20 @@ controls = NodePath("OctopusControls")
 [node name="Studio" parent="." instance=ExtResource("2_studio")]
 
 [node name="Mannequin" parent="." instance=ExtResource("3_mannequin")]
+config = ExtResource("4_bust_config")
+visual_scene = ExtResource("5_bust_model")
+visual_scale = Vector3(3.3786, 3.3786, 3.3786)
+material = null
 
-[node name="Rope" parent="." instance=ExtResource("4_rope")]
-config = ExtResource("5_rope_config")
+[node name="Rope" parent="." instance=ExtResource("6_rope")]
+config = ExtResource("7_rope_config")
 initial_layout = 1
 hold_on_release = false
 
-[node name="CameraRig" parent="." instance=ExtResource("6_camera")]
-config = ExtResource("7_camera_config")
+[node name="CameraRig" parent="." instance=ExtResource("8_camera")]
+config = ExtResource("9_camera_config")
 
-[node name="Octopus" parent="." node_paths=PackedStringArray("rope") instance=ExtResource("8_octopus")]
+[node name="Octopus" parent="." node_paths=PackedStringArray("rope") instance=ExtResource("10_octopus")]
 rope = NodePath("../Rope")
 
-[node name="OctopusControls" parent="." instance=ExtResource("9_controls")]
+[node name="OctopusControls" parent="." instance=ExtResource("11_controls")]
