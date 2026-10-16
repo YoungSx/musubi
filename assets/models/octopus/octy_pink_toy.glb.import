@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cn24a7u3nps7v"
-path="res://.godot/imported/takoyaki_mascot.glb-8f3a2fa2e476920fe79fa8362ad8cf64.scn"
+uid="uid://b2whpk1d03432"
+path="res://.godot/imported/octy_pink_toy.glb-6456751772dcc12f658bdde130202089.scn"
 
 [deps]
 
-source_file="res://assets/models/octopus/takoyaki_mascot.glb"
-dest_files=["res://.godot/imported/takoyaki_mascot.glb-8f3a2fa2e476920fe79fa8362ad8cf64.scn"]
+source_file="res://assets/models/octopus/octy_pink_toy.glb"
+dest_files=["res://.godot/imported/octy_pink_toy.glb-6456751772dcc12f658bdde130202089.scn"]
 
 [params]
 

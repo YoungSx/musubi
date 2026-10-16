@@ -2,7 +2,7 @@
 
 [resource]
 resource_name = "Octopus"
-albedo_color = Color(0.93, 0.35, 0.3, 1)
+albedo_color = Color(0.98, 0.48, 0.61, 1)
 roughness = 0.4
 rim_enabled = true
 rim = 0.5
