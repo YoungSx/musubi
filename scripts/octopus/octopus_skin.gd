@@ -1,78 +1,128 @@
 class_name OctopusSkin
-extends MultiMeshInstance3D
-## Draws the dynamic reaching arm when extending/holding rope, while the
-## mascot's integrated 3D model displays the resting tentacle feet.
+extends MeshInstance3D
+## Procedural continuous cartoon tentacle mesh using Godot's native ArrayMesh.
 ##
-## Presentation only: it holds no simulation state and never decides anything.
-## Reusing MultiMesh keeps arm draw calls minimal.
+## When reaching/holding rope, generates a smooth tapered swept tube that emerges
+## seamlessly from the octopus model's tentacle base, featuring a two-tone cartoon
+## finish (pastel pink back, soft cream underbelly) and a rounded tip cap.
+## When idle, clears surfaces so only the mascot toy's resting tentacles are shown.
 
-## World-space instance transforms; the body transform arrives as a parameter.
-@export var top_level_arms := true
+@export var radial_segments: int = 12
+@export var top_level_arms: bool = true
 
 var _config: OctopusConfig
-var _time := 0.0
+var _mesh := ArrayMesh.new()
+var _surface := []
+
+
+func _ready() -> void:
+	top_level = top_level_arms
+	global_transform = Transform3D.IDENTITY
+	mesh = _mesh
+	_surface.resize(Mesh.ARRAY_MAX)
 
 
 func configure(config: OctopusConfig) -> void:
 	_config = config
 	top_level = top_level_arms
-	multimesh = MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = _bead_mesh()
-	multimesh.instance_count = config.arm_count * config.arm_beads
+	global_transform = Transform3D.IDENTITY
+	mesh = _mesh
+	_surface.resize(Mesh.ARRAY_MAX)
 
 
-func _process(delta: float) -> void:
-	_time += delta
-
-
-## The reaching arm follows the supplied curve; resting arms are tucked
-## away so the mascot model's integrated tentacle feet are cleanly shown.
-func update_arms(body: Transform3D, reach_curve: PackedVector3Array) -> void:
-	if _config == null or multimesh == null:
+func update_arms(_body: Transform3D, reach_curve: PackedVector3Array) -> void:
+	if _config == null or _mesh == null:
 		return
-	var beads := _config.arm_beads
-	var is_reaching := (reach_curve.size() == beads)
-	for arm in _config.arm_count:
-		if arm == 0 and is_reaching:
-			for bead in beads:
-				var t := float(bead) / float(maxi(beads - 1, 1))
-				var radius := _config.mantle_radius * lerpf(0.32, 0.06, t * t)
-				multimesh.set_instance_transform(
-					bead,
-					Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * radius), reach_curve[bead])
-				)
+	if reach_curve.size() < 2:
+		_mesh.clear_surfaces()
+		return
+	_build_tentacle_mesh(reach_curve)
+
+
+func _build_tentacle_mesh(curve: PackedVector3Array) -> void:
+	var rings := curve.size()
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var colors := PackedColorArray()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+
+	var root_radius := _config.mantle_radius * 0.28
+	var tip_radius := _config.mantle_radius * 0.08
+	var pink_color := Color(0.98, 0.48, 0.61, 1.0)
+	var cream_color := Color(1.0, 0.88, 0.90, 1.0)
+
+	var tangent0 := (curve[1] - curve[0]).normalized()
+	if tangent0.is_zero_approx():
+		tangent0 = Vector3.FORWARD
+	var normal := tangent0.cross(Vector3.UP)
+	if normal.length_squared() < 1e-6:
+		normal = tangent0.cross(Vector3.RIGHT)
+	normal = normal.normalized()
+
+	for i in rings:
+		var t := float(i) / float(rings - 1)
+		var p := curve[i]
+		var tangent: Vector3
+		if i == 0:
+			tangent = (curve[1] - curve[0]).normalized()
+		elif i == rings - 1:
+			tangent = (curve[rings - 1] - curve[rings - 2]).normalized()
 		else:
-			for bead in beads:
-				multimesh.set_instance_transform(
-					arm * beads + bead,
-					Transform3D(Basis.IDENTITY.scaled(Vector3.ZERO), body.origin)
-				)
+			tangent = (curve[i + 1] - curve[i - 1]).normalized()
+		if tangent.is_zero_approx():
+			tangent = tangent0
 
+		normal = normal.slide(tangent).normalized()
+		if normal.is_zero_approx():
+			normal = tangent.cross(Vector3.UP).normalized()
+		var binormal := tangent.cross(normal).normalized()
 
-static func idle_curve(body: Transform3D, arm: int, config: OctopusConfig, time: float) -> PackedVector3Array:
-	var beads := config.arm_beads
-	var count := maxi(config.arm_count, 1)
-	var angle := PI + TAU * (float(arm) + 0.5) / float(count) * 0.78
-	var outward := (body.basis.x * sin(angle) - body.basis.z * cos(angle)).normalized()
-	var phase := sin(time * 1.7 + float(arm) * 1.9)
-	var curl := phase * 0.3
-	var length := config.mantle_radius * (2.1 + 0.45 * sin(float(arm) * 2.3))
-	var points := PackedVector3Array()
-	points.resize(beads)
-	for bead in beads:
-		var t := float(bead) / float(maxi(beads - 1, 1))
-		var span := config.mantle_radius * 0.5 + length * t
-		var droop := config.body_radius * (2.4 * t * t - 0.5 * t) * (1.0 + 0.3 * phase)
-		var side := body.basis.y.cross(outward) * (span * curl * t)
-		points[bead] = body.origin + outward * span + side - body.basis.y * droop
-	return points
+		var radius := lerpf(root_radius, tip_radius, sqrt(t))
+		for j in radial_segments + 1:
+			var angle := TAU * float(j) / float(radial_segments)
+			var offset := (normal * cos(angle) + binormal * sin(angle)) * radius
+			verts.append(p + offset)
+			norms.append(offset.normalized())
+			uvs.append(Vector2(float(j) / float(radial_segments), t))
+			# Underbelly color (cream) vs upper dorsal color (pink)
+			var underbelly := clampf(-sin(angle), 0.0, 1.0)
+			colors.append(pink_color.lerp(cream_color, underbelly * 0.85))
 
+	# Hemispherical tip cap
+	var tip_center := curve[rings - 1]
+	var tip_tangent := (curve[rings - 1] - curve[rings - 2]).normalized()
+	verts.append(tip_center + tip_tangent * tip_radius)
+	norms.append(tip_tangent)
+	colors.append(pink_color)
+	uvs.append(Vector2(0.5, 1.0))
+	var tip_idx := verts.size() - 1
 
-static func _bead_mesh() -> SphereMesh:
-	var mesh := SphereMesh.new()
-	mesh.radius = 1.0
-	mesh.height = 2.0
-	mesh.radial_segments = 16
-	mesh.rings = 8
-	return mesh
+	var stride := radial_segments + 1
+	for i in rings - 1:
+		for j in radial_segments:
+			var r0 := i * stride + j
+			var r1 := r0 + 1
+			var r2 := (i + 1) * stride + j
+			var r3 := r2 + 1
+			indices.append(r0)
+			indices.append(r2)
+			indices.append(r1)
+			indices.append(r1)
+			indices.append(r2)
+			indices.append(r3)
+
+	var last_ring_start := (rings - 1) * stride
+	for j in radial_segments:
+		indices.append(last_ring_start + j)
+		indices.append(tip_idx)
+		indices.append(last_ring_start + j + 1)
+
+	_surface[Mesh.ARRAY_VERTEX] = verts
+	_surface[Mesh.ARRAY_NORMAL] = norms
+	_surface[Mesh.ARRAY_COLOR] = colors
+	_surface[Mesh.ARRAY_TEX_UV] = uvs
+	_surface[Mesh.ARRAY_INDEX] = indices
+	_mesh.clear_surfaces()
+	_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _surface)
+	_surface.fill(null)
