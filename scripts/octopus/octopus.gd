@@ -127,10 +127,12 @@ func get_carry_point() -> Vector3:
 	return _walker.position + _walker.up * config.carry_offset
 
 
-## Arm root on the mantle, biased toward whatever the arm is reaching for.
+## Arm root on the mascot model's perimeter, seamlessly continuing from the tentacle base.
 func get_shoulder(toward: Vector3) -> Vector3:
 	var lateral := SurfaceWalker.tangent(toward - _walker.position, _walker.up)
-	return _walker.position + _walker.up * (config.mantle_radius * 0.3) + lateral * (config.mantle_radius * 0.6)
+	if lateral == Vector3.ZERO:
+		lateral = SurfaceWalker.tangent(global_transform.basis.z, _walker.up)
+	return _walker.position - _walker.up * (config.body_radius * 0.7) + lateral * (config.mantle_radius * 0.85)
 
 
 func _apply_transform(delta: float = 0.0) -> void:

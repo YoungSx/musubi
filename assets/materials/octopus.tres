@@ -2,8 +2,9 @@
 
 [resource]
 resource_name = "Octopus"
-albedo_color = Color(0.98, 0.48, 0.61, 1)
-roughness = 0.4
+vertex_color_use_as_albedo = true
+albedo_color = Color(1, 1, 1, 1)
+roughness = 0.35
 rim_enabled = true
 rim = 0.5
 rim_tint = 0.35
