@@ -4,7 +4,7 @@
 [ext_resource type="Resource" path="res://data/octopus/default_octopus.tres" id="2_config"]
 [ext_resource type="Script" path="res://scripts/octopus/octopus_skin.gd" id="3_skin"]
 [ext_resource type="Material" path="res://assets/materials/octopus.tres" id="4_material"]
-[ext_resource type="PackedScene" path="res://assets/models/octopus/takoyaki_mascot.glb" id="5_mascot"]
+[ext_resource type="PackedScene" path="res://assets/models/octopus/octy_pink_toy.glb" id="5_mascot"]
 
 [node name="Octopus" type="Node3D" node_paths=PackedStringArray("skin")]
 script = ExtResource("1_octopus")
@@ -12,15 +12,15 @@ config = ExtResource("2_config")
 skin = NodePath("Arms")
 
 [node name="Mascot" parent="." instance=ExtResource("5_mascot")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.022, 0)
+transform = Transform3D(0.00018, 0, 0, 0, 0.00018, 0, 0, 0, 0.00018, 0, -0.0015, 0)
 
 [node name="Arms" type="MultiMeshInstance3D" parent="."]
 material_override = ExtResource("4_material")
 script = ExtResource("3_skin")
 
 [node name="FaceLight" type="OmniLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, -0.12)
-light_color = Color(1, 0.96, 0.92, 1)
-light_energy = 1.6
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, -0.14)
+light_color = Color(1, 0.97, 0.95, 1)
+light_energy = 1.4
 omni_range = 0.8
 omni_attenuation = 1.0
