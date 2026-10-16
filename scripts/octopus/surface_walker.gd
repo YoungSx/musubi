@@ -108,7 +108,7 @@ func _snap(point: Vector3) -> void:
 		return
 	var settled := point
 	var normal := Vector3.ZERO
-	for pass_index in 3:
+	for pass_index in 4:
 		normal = _normal(settled)
 		if normal == Vector3.ZERO:
 			break
@@ -138,7 +138,7 @@ func _clearance(point: Vector3) -> float:
 func _body_weight(point: Vector3) -> float:
 	if not _collision.floor_enabled:
 		return 1.0
-	var band := maxf(_config.body_radius, 0.001)
+	var band := maxf(_config.body_radius * 1.5, 0.001)
 	return smoothstep(-band, band, (point.y - _collision.floor_height) - _collision.get_body_clearance(point))
 
 

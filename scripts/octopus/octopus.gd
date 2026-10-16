@@ -36,7 +36,7 @@ func attach_to_world() -> void:
 
 func advance(delta: float, intent: Vector3) -> void:
 	_walker.step(delta, intent)
-	_apply_transform()
+	_apply_transform(delta)
 	if _grab.is_active():
 		_grab.carry(get_carry_point(), delta)
 		_arm.hold(get_shoulder(_grab.get_position()), _grab.get_position(), _grab.is_drawn_in())
@@ -133,8 +133,15 @@ func get_shoulder(toward: Vector3) -> Vector3:
 	return _walker.position + _walker.up * (config.mantle_radius * 0.3) + lateral * (config.mantle_radius * 0.6)
 
 
-func _apply_transform() -> void:
-	global_transform = Transform3D(_walker.get_basis(), _walker.position)
+func _apply_transform(delta: float = 0.0) -> void:
+	var target_basis := _walker.get_basis()
+	if delta > 0.0 and is_inside_tree() and global_transform.basis != Basis():
+		var weight := 1.0 - exp(-delta * 22.0)
+		var current_basis := global_transform.basis.orthonormalized()
+		var smoothed_basis := current_basis.slerp(target_basis, weight).orthonormalized()
+		global_transform = Transform3D(smoothed_basis, _walker.position)
+	else:
+		global_transform = Transform3D(target_basis, _walker.position)
 
 
 func _update_skin() -> void:
