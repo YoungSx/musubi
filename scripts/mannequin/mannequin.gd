@@ -34,6 +34,7 @@ var _rebuild_pending := false
 func _ready() -> void:
 	_initial_transform = transform
 	_rebuild()
+	update_configuration_warnings()
 
 
 func reset_pose() -> void:
@@ -88,6 +89,41 @@ func get_collision_aabb() -> AABB:
 	return total_aabb
 
 
+## Returns bounding mismatch metrics between visual mesh and collision shapes.
+func get_visual_collision_mismatch() -> Dictionary:
+	var visual_aabb := get_visual_aabb()
+	var collision_aabb := get_collision_aabb()
+	var height_diff := absf(visual_aabb.size.y - collision_aabb.size.y)
+	var center_diff := visual_aabb.get_center().distance_to(collision_aabb.get_center())
+	var has_visual := visual_aabb.size.length_squared() > 0.0001
+	var has_collision := collision_aabb.size.length_squared() > 0.0001
+	var is_aligned := (not has_visual or not has_collision) or (height_diff <= 0.15 and center_diff <= 0.15)
+	return {
+		"visual_aabb": visual_aabb,
+		"collision_aabb": collision_aabb,
+		"height_diff": height_diff,
+		"center_diff": center_diff,
+		"is_aligned": is_aligned
+	}
+
+
+func _get_configuration_warnings() -> PackedStringArray:
+	var warnings := PackedStringArray()
+	if config == null:
+		warnings.append("Missing MannequinConfig resource.")
+		return warnings
+	if visual_scene != null:
+		var mismatch := get_visual_collision_mismatch()
+		if not mismatch["is_aligned"]:
+			warnings.append(
+				"Visual mesh bounds differ from collision bounds (height diff: %.2fm, center diff: %.2fm). Adjust collision parts or visual_scale to avoid penetration/floating." % [
+					mismatch["height_diff"],
+					mismatch["center_diff"]
+				]
+			)
+	return warnings
+
+
 static func _get_shape_aabb(shape: Shape3D) -> AABB:
 	if shape is BoxShape3D:
 		var size := (shape as BoxShape3D).size
@@ -113,6 +149,7 @@ func _rebuild() -> void:
 	_rebuild_pending = false
 	_free_generated()
 	if config == null:
+		update_configuration_warnings()
 		return
 
 	_visual_root = Node3D.new()
@@ -133,6 +170,8 @@ func _rebuild() -> void:
 
 	if visual_scene != null:
 		_add_custom_visual()
+
+	update_configuration_warnings()
 
 
 func _add_part(part: MannequinPart) -> void:
@@ -165,8 +204,9 @@ func _add_custom_visual() -> void:
 
 func _free_generated() -> void:
 	for node: Node in [_visual_root, _body]:
-		if node != null:
-			remove_child(node)
+		if is_instance_valid(node):
+			if node.get_parent() == self:
+				remove_child(node)
 			node.queue_free()
 	_visual_root = null
 	_body = null
