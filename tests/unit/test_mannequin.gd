@@ -95,3 +95,32 @@ func test_custom_visual_surface_clearance_against_collision() -> void:
 	var avg_surface_error := sum_surface_error / float(sample_count)
 	assert_true(avg_surface_error < 0.12, "average surface deviation from collision must be < 0.12m (got %.4f)" % avg_surface_error)
 	assert_true(max_surface_error < 0.30, "max surface deviation from collision must be < 0.30m (got %.4f)" % max_surface_error)
+
+
+func test_editor_configuration_warnings_and_mismatch_metrics() -> void:
+	var mannequin := MannequinScene.instantiate() as Mannequin
+	mannequin.config = load("res://data/mannequin/marble_bust.tres") as MannequinConfig
+	mannequin.visual_scene = load("res://assets/models/marble_bust_01/marble_bust_01_2k.gltf") as PackedScene
+	mannequin.visual_scale = Vector3(3.3786, 3.3786, 3.3786)
+	add_to_tree(mannequin)
+
+	var mismatch := mannequin.get_visual_collision_mismatch()
+	assert_true(mismatch["is_aligned"], "properly scaled marble bust is aligned")
+	assert_true(mismatch["height_diff"] < 0.15, "height diff within 0.15m")
+	var warnings := mannequin._get_configuration_warnings()
+	assert_eq(warnings.size(), 0, "no configuration warnings when properly aligned")
+
+	# Test warning on missing config
+	mannequin.config = null
+	mannequin._rebuild()
+	var no_config_warnings := mannequin._get_configuration_warnings()
+	assert_true(no_config_warnings.size() > 0, "warns when config is null")
+
+	# Test warning on severe mismatch (e.g. unscaled or 10x scaled model)
+	mannequin.config = load("res://data/mannequin/marble_bust.tres") as MannequinConfig
+	mannequin.visual_scale = Vector3.ONE * 10.0
+	mannequin._rebuild()
+	var bad_mismatch := mannequin.get_visual_collision_mismatch()
+	assert_true(not bad_mismatch["is_aligned"], "detects 10x scaled visual as mismatched")
+	var bad_warnings := mannequin._get_configuration_warnings()
+	assert_true(bad_warnings.size() > 0, "warns when visual bounds diverge from collision")
