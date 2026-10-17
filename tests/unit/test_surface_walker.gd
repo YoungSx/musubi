@@ -79,6 +79,74 @@ func test_floor_and_body_crease_has_a_blended_normal() -> void:
 	assert_true(walker.up.y > 0.1, "blended normal keeps a usable tangent plane")
 
 
+func test_climbs_right_angle_box_step_and_rounds_corner() -> void:
+	var box_part := MannequinPart.new()
+	box_part.primitive = MannequinPart.Primitive.BOX
+	box_part.box_size = Vector3(0.6, 0.3, 0.6)
+	box_part.position = Vector3(0.0, 0.15, 0.0)
+
+	var walker := _walker(_collision(box_part, true))
+	walker.place(Vector3(0.0, 0.03, 0.5))
+
+	for i in 120:
+		var intent := SurfaceWalker.camera_intent(Vector2(0, -1), 0.0, walker.up)
+		walker.step(1.0 / 60.0, intent)
+
+	assert_true(walker.contact == SurfaceWalker.Contact.BODY, "attached to box body after climbing")
+	assert_true(walker.position.y >= 0.32, "climbed vertical face onto roof of box")
+	assert_true(walker.position.z < 0.25, "rounded 90-degree corner onto roof")
+
+
+func test_multi_part_crease_does_not_trap_normal_gradient() -> void:
+	var plinth := MannequinPart.new()
+	plinth.primitive = MannequinPart.Primitive.BOX
+	plinth.box_size = Vector3(0.6, 0.2, 0.6)
+	plinth.position = Vector3(0.0, 0.1, 0.0)
+
+	var torso := MannequinPart.new()
+	torso.primitive = MannequinPart.Primitive.CAPSULE
+	torso.radius = 0.2
+	torso.height = 0.6
+	torso.position = Vector3(0.0, 0.4, 0.0)
+
+	var config := MannequinConfig.new()
+	config.parts = [plinth, torso]
+	var collision := RopeCollision.new()
+	collision.floor_enabled = true
+	collision.configure(config)
+
+	var walker := SurfaceWalker.new()
+	walker.configure(_config(), collision)
+	walker.place(Vector3(0.0, 0.23, 0.26))
+
+	for i in 60:
+		var intent := SurfaceWalker.camera_intent(Vector2(0, -1), 0.0, walker.up)
+		walker.step(1.0 / 60.0, intent)
+
+	assert_true(walker.contact == SurfaceWalker.Contact.BODY, "attached to body across crease")
+	assert_true(walker.position.y > 0.3, "climbed past crease onto torso without oscillation trap")
+
+
+func test_bust_sculpture_full_traversal() -> void:
+	var bust_config := load("res://data/mannequin/marble_bust.tres") as MannequinConfig
+	var bust_collision := RopeCollision.new()
+	bust_collision.floor_enabled = true
+	bust_collision.configure(bust_config)
+
+	var walker := SurfaceWalker.new()
+	walker.configure(_config(), bust_collision)
+	walker.place(Vector3(0.0, 0.03, 0.55))
+
+	for i in 250:
+		var intent := SurfaceWalker.camera_intent(Vector2(0, -1), 0.0, walker.up)
+		walker.step(1.0 / 60.0, intent)
+		if walker.position.y > 1.65:
+			break
+
+	assert_true(walker.contact == SurfaceWalker.Contact.BODY, "remains adhered to bust throughout")
+	assert_true(walker.position.y > 1.60, "climbed successfully all the way to top of head")
+
+
 func test_camera_frame_walks_away_from_the_camera_on_flat_ground() -> void:
 	var intent := SurfaceWalker.camera_intent(Vector2(0.0, -1.0), 0.0, Vector3.UP)
 	assert_true(intent.z < -0.9, "stick up walks away from a camera looking down -Z")

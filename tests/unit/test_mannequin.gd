@@ -27,3 +27,71 @@ func test_reset_pose_restores_transform() -> void:
 	mannequin.rotate_y(1.0)
 	mannequin.reset_pose()
 	assert_true(mannequin.transform.is_equal_approx(initial), "transform restored")
+
+
+func test_marble_bust_config_parts_valid() -> void:
+	var config := load("res://data/mannequin/marble_bust.tres") as MannequinConfig
+	assert_true(config != null, "marble bust config exists")
+	assert_true(config.parts.size() >= 5, "marble bust has all primary body parts")
+	for part in config.parts:
+		assert_true(part.is_valid(), "part '%s' valid" % part.part_name)
+
+
+func test_custom_visual_scene_bounds_align_with_collision() -> void:
+	var mannequin := MannequinScene.instantiate() as Mannequin
+	mannequin.config = load("res://data/mannequin/marble_bust.tres") as MannequinConfig
+	mannequin.visual_scene = load("res://assets/models/marble_bust_01/marble_bust_01_2k.gltf") as PackedScene
+	mannequin.visual_scale = Vector3(3.3786, 3.3786, 3.3786)
+	add_to_tree(mannequin)
+
+	var visual_aabb := mannequin.get_visual_aabb()
+	var collision_aabb := mannequin.get_collision_aabb()
+	assert_true(visual_aabb.size.length() > 0.1, "visual AABB must be non-empty")
+	assert_true(collision_aabb.size.length() > 0.1, "collision AABB must be non-empty")
+
+	# Check bounding height match
+	var height_diff := absf(visual_aabb.size.y - collision_aabb.size.y)
+	assert_true(height_diff < 0.15, "height difference between visual and collision bounds must be < 0.15m (got %.4f)" % height_diff)
+
+	# Check center alignment
+	var center_diff := visual_aabb.get_center().distance_to(collision_aabb.get_center())
+	assert_true(center_diff < 0.15, "center offset between visual and collision bounds must be < 0.15m (got %.4f)" % center_diff)
+
+
+func test_custom_visual_surface_clearance_against_collision() -> void:
+	var config := load("res://data/mannequin/marble_bust.tres") as MannequinConfig
+	var collision := RopeCollision.new()
+	collision.configure(config)
+
+	var gltf_scene := load("res://assets/models/marble_bust_01/marble_bust_01_2k.gltf") as PackedScene
+	var instance := gltf_scene.instantiate() as Node3D
+	instance.scale = Vector3.ONE * 3.3786
+	add_to_tree(instance)
+
+	var mesh_instances: Array[MeshInstance3D] = []
+	for child in instance.find_children("*", "MeshInstance3D", true, false):
+		mesh_instances.append(child as MeshInstance3D)
+	assert_true(mesh_instances.size() > 0, "found mesh instances in custom visual")
+
+	var max_surface_error := 0.0
+	var sum_surface_error := 0.0
+	var sample_count := 0
+
+	for mi in mesh_instances:
+		var mesh := mi.mesh
+		if mesh == null:
+			continue
+		var arrays := mesh.surface_get_arrays(0)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var step := maxi(1, vertices.size() / 100)
+		for i in range(0, vertices.size(), step):
+			var world_v := mi.global_transform * vertices[i]
+			var clr := absf(collision.get_body_clearance(world_v))
+			max_surface_error = maxf(max_surface_error, clr)
+			sum_surface_error += clr
+			sample_count += 1
+
+	assert_true(sample_count > 50, "sampled at least 50 surface points")
+	var avg_surface_error := sum_surface_error / float(sample_count)
+	assert_true(avg_surface_error < 0.12, "average surface deviation from collision must be < 0.12m (got %.4f)" % avg_surface_error)
+	assert_true(max_surface_error < 0.30, "max surface deviation from collision must be < 0.30m (got %.4f)" % max_surface_error)

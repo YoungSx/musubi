@@ -367,6 +367,8 @@ func _frames(count: int) -> void:
 
 
 func _capture(label: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
 	await RenderingServer.frame_post_draw
 	_check(root.get_texture().get_image().save_png(output.path_join(label + ".png")) == OK, "capture " + label)
 
