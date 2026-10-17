@@ -4,17 +4,23 @@ extends Node3D
 ##
 ## It owns no input and no camera. Callers advance it with a world-space move
 ## intent and ask it to grab along an aim direction; everything else is the
-## composition of SurfaceWalker, OctopusArm and OctopusGrab.
+## composition of SurfaceWalker, OctopusArm, OctopusGrab, and OctopusLocomotion.
+
+const OctopusLocomotionScript = preload("res://scripts/octopus/octopus_locomotion.gd")
 
 @export var config: OctopusConfig
 @export var rope: Rope
 @export var skin: OctopusSkin
+@export var mascot: Node3D
 ## Where the octopus starts, in this node's parent space.
 @export var spawn_point: Vector3 = Vector3(0.0, 0.0, 0.55)
 
 var _walker := SurfaceWalker.new()
 var _arm := OctopusArm.new()
 var _grab := OctopusGrab.new()
+var _locomotion = OctopusLocomotionScript.new()
+var _base_mascot_transform: Transform3D
+var _active_shoulder_local_dir := Vector2(0.0, 1.0)
 
 
 func _ready() -> void:
@@ -24,6 +30,10 @@ func _ready() -> void:
 	_grab.configure(config, rope)
 	if skin != null:
 		skin.configure(config)
+	if mascot == null and has_node("Mascot"):
+		mascot = get_node("Mascot") as Node3D
+	if mascot != null:
+		_base_mascot_transform = mascot.transform
 
 
 ## Call after the rope's collision geometry is installed.
@@ -35,8 +45,11 @@ func attach_to_world() -> void:
 
 
 func advance(delta: float, intent: Vector3) -> void:
+	var speed := intent.length() * config.move_speed
 	_walker.step(delta, intent)
 	_apply_transform(delta)
+	if mascot != null:
+		_locomotion.step(delta, speed, mascot, _base_mascot_transform)
 	if _grab.is_active():
 		_grab.carry(get_carry_point(), delta)
 		_arm.hold(get_shoulder(_grab.get_position()), _grab.get_position(), _grab.is_drawn_in())
@@ -57,6 +70,7 @@ func grab(direction: Vector3, view_normal := Vector3.ZERO) -> bool:
 	if not _grab.grab(get_eye(), direction, view_normal):
 		return false
 	var anchor := _grab.get_position()
+	_update_shoulder_aim(anchor)
 	_arm.reach(get_shoulder(anchor), anchor)
 	return true
 
@@ -129,10 +143,27 @@ func get_carry_point() -> Vector3:
 
 ## Arm root on the mascot model's perimeter, seamlessly continuing from the tentacle base.
 func get_shoulder(toward: Vector3) -> Vector3:
+	if mascot != null and is_inside_tree() and mascot.is_inside_tree():
+		if not _grab.is_active():
+			_update_shoulder_aim(toward)
+		var local_pt := Vector3(_active_shoulder_local_dir.x * 270.0, 50.0, _active_shoulder_local_dir.y * 270.0)
+		return mascot.global_transform * local_pt
+
 	var lateral := SurfaceWalker.tangent(toward - _walker.position, _walker.up)
-	if lateral == Vector3.ZERO:
-		lateral = SurfaceWalker.tangent(global_transform.basis.z, _walker.up)
-	return _walker.position - _walker.up * (config.body_radius * 0.7) + lateral * (config.mantle_radius * 0.85)
+	if lateral.length_squared() < 1e-4:
+		lateral = SurfaceWalker.tangent(-global_transform.basis.z, _walker.up)
+	else:
+		lateral = lateral.normalized()
+	return _walker.position + _walker.up * (config.body_radius * 0.25) + lateral * (config.mantle_radius * 0.90)
+
+
+func _update_shoulder_aim(toward: Vector3) -> void:
+	if mascot == null or not is_inside_tree() or not mascot.is_inside_tree():
+		return
+	var local_toward := mascot.global_transform.affine_inverse() * toward
+	var dir_2d := Vector2(local_toward.x, local_toward.z)
+	if dir_2d.length_squared() > 1e-4:
+		_active_shoulder_local_dir = dir_2d.normalized()
 
 
 func _apply_transform(delta: float = 0.0) -> void:

@@ -6,13 +6,14 @@
 [ext_resource type="Material" path="res://assets/materials/octopus.tres" id="4_material"]
 [ext_resource type="PackedScene" path="res://assets/models/octopus/octy_pink_toy.glb" id="5_mascot"]
 
-[node name="Octopus" type="Node3D" node_paths=PackedStringArray("skin")]
+[node name="Octopus" type="Node3D" node_paths=PackedStringArray("skin", "mascot")]
 script = ExtResource("1_octopus")
 config = ExtResource("2_config")
 skin = NodePath("Arms")
+mascot = NodePath("Mascot")
 
 [node name="Mascot" parent="." instance=ExtResource("5_mascot")]
-transform = Transform3D(0.00018, 0, 0, 0, 0.00018, 0, 0, 0, 0.00018, 0, -0.0015, 0)
+transform = Transform3D(-0.00018, 0, 0, 0, 0.00018, 0, 0, 0, -0.00018, 0, -0.0015, 0)
 
 [node name="Arms" type="MeshInstance3D" parent="."]
 material_override = ExtResource("4_material")
