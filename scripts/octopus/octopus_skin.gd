@@ -1,27 +1,21 @@
 class_name OctopusSkin
 extends MeshInstance3D
-## Procedural continuous cartoon tentacle mesh using Godot's native ArrayMesh.
+## Procedural continuous mesh skin for the octopus reaching arm.
 ##
-## When reaching/holding rope, generates an agile, slender tapered swept tube that
-## emerges naturally from the mascot model's tentacle base.
-## The base root maintains anatomical thickness without over-stretching, while the
-## flexible trunk and tip elastically elongate.
-## Features a two-tone cartoon finish (pastel pink back, soft cream underbelly)
-## and a rounded tip cap.
-## When idle, clears surfaces so only the mascot toy's resting tentacles are shown.
+## Constructs an organic 3D tentacle with thick base, tapering shaft,
+## hemispherical tip, and two-tone underbelly shading.
 
-@export var radial_segments: int = 12
-@export var subdivisions: int = 2
+@export_range(6, 24, 2) var radial_segments: int = 12
+@export_range(1, 4, 1) var subdivisions: int = 2
 @export var top_level_arms: bool = true
 
 var _config: OctopusConfig
-var _mesh := ArrayMesh.new()
-var _surface := []
+var _mesh: ArrayMesh
+var _surface: Array = []
 
 
 func _ready() -> void:
-	top_level = top_level_arms
-	global_transform = Transform3D.IDENTITY
+	_mesh = ArrayMesh.new()
 	mesh = _mesh
 	_surface.resize(Mesh.ARRAY_MAX)
 
@@ -66,10 +60,10 @@ func _build_tentacle_mesh(raw_curve: PackedVector3Array) -> void:
 	var indices := PackedInt32Array()
 
 	# Proportions calibrated to the pink octopus toy model:
-	# - Natural leg base: ~5.5mm radius (11mm diameter)
+	# - Natural leg base: ~6.0mm radius (12mm diameter)
 	# - Elastic main trunk: slender ~2.0-2.6mm radius, thinning slightly with stretch
 	# - Tip: ~1.4mm radius (2.8mm diameter)
-	var r_base: float = 0.0055
+	var r_base: float = 0.0062
 	var r_shaft: float = clampf(0.0035 / sqrt(1.0 + total_span * 2.5), 0.0018, 0.0028)
 	var r_tip: float = 0.0014
 
@@ -130,6 +124,14 @@ func _build_tentacle_mesh(raw_curve: PackedVector3Array) -> void:
 	uvs.append(Vector2(0.5, 1.0))
 	var tip_idx := verts.size() - 1
 
+	# Root cap (closing the base ring into the mascot socket)
+	var root_center := curve[0] - tangent0 * 0.003
+	verts.append(root_center)
+	norms.append(-tangent0)
+	colors.append(pink_color)
+	uvs.append(Vector2(0.5, 0.0))
+	var root_idx := verts.size() - 1
+
 	var stride := radial_segments + 1
 	for i in rings - 1:
 		for j in radial_segments:
@@ -149,6 +151,12 @@ func _build_tentacle_mesh(raw_curve: PackedVector3Array) -> void:
 		indices.append(last_ring_start + j)
 		indices.append(tip_idx)
 		indices.append(last_ring_start + j + 1)
+
+	# Connect root cap to ring 0
+	for j in radial_segments:
+		indices.append(root_idx)
+		indices.append(j + 1)
+		indices.append(j)
 
 	_surface[Mesh.ARRAY_VERTEX] = verts
 	_surface[Mesh.ARRAY_NORMAL] = norms

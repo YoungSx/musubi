@@ -38,6 +38,8 @@ const TEST_SCRIPTS: Array[String] = [
 	"res://tests/unit/test_octopus_grab.gd",
 	"res://tests/unit/test_octopus_camera.gd",
 	"res://tests/unit/test_octopus_aim_feedback.gd",
+	"res://tests/unit/test_octopus_attachment.gd",
+	"res://tests/unit/test_octopus_locomotion.gd",
 ]
 
 
@@ -73,5 +75,6 @@ func _run() -> void:
 				failed += 1
 				for failure in test.failures:
 					printerr("FAIL  %s::%s: %s" % [path.get_file(), method_name, failure])
+
 	print("\n%d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)
