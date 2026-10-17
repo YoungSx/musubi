@@ -130,10 +130,54 @@ func get_slice_parts(height: float,padding: float) -> Array[Collider]:
 			result.append(part)
 	return result
 
-func get_body_normal(point: Vector3) -> Vector3:
-	var epsilon := 0.0001
-	var gradient := Vector3(get_body_clearance(point+Vector3.RIGHT*epsilon)-get_body_clearance(point-Vector3.RIGHT*epsilon),get_body_clearance(point+Vector3.UP*epsilon)-get_body_clearance(point-Vector3.UP*epsilon),get_body_clearance(point+Vector3.BACK*epsilon)-get_body_clearance(point-Vector3.BACK*epsilon))
+func get_part_normal(part: Collider, point: Vector3) -> Vector3:
+	var epsilon := 0.001
+	var gradient := Vector3(
+		part.clearance(point + Vector3.RIGHT * epsilon) - part.clearance(point - Vector3.RIGHT * epsilon),
+		part.clearance(point + Vector3.UP * epsilon) - part.clearance(point - Vector3.UP * epsilon),
+		part.clearance(point + Vector3.BACK * epsilon) - part.clearance(point - Vector3.BACK * epsilon)
+	)
 	return gradient.normalized() if gradient.is_finite() and gradient.length_squared() > 1e-12 else Vector3.ZERO
+
+
+func get_body_normal(point: Vector3, smoothing: float = 0.0) -> Vector3:
+	if _parts.is_empty():
+		return Vector3.ZERO
+	if smoothing <= 0.0 or _parts.size() == 1:
+		var epsilon := 0.0001
+		var gradient := Vector3(get_body_clearance(point+Vector3.RIGHT*epsilon)-get_body_clearance(point-Vector3.RIGHT*epsilon),get_body_clearance(point+Vector3.UP*epsilon)-get_body_clearance(point-Vector3.UP*epsilon),get_body_clearance(point+Vector3.BACK*epsilon)-get_body_clearance(point-Vector3.BACK*epsilon))
+		return gradient.normalized() if gradient.is_finite() and gradient.length_squared() > 1e-12 else Vector3.ZERO
+
+	var d0 := INF
+	var p0: Collider = null
+	var d1 := INF
+	var p1: Collider = null
+
+	for part in _parts:
+		var d := part.clearance(point)
+		if d < d0:
+			d1 = d0
+			p1 = p0
+			d0 = d
+			p0 = part
+		elif d < d1:
+			d1 = d
+			p1 = part
+
+	if p0 == null:
+		return Vector3.ZERO
+	var n0 := get_part_normal(p0, point)
+	if p1 == null or d1 >= INF:
+		return n0
+
+	if absf(d0 - d1) < smoothing:
+		var n1 := get_part_normal(p1, point)
+		var h := clampf(0.5 + 0.5 * (d1 - d0) / smoothing, 0.0, 1.0)
+		var blended := n1.lerp(n0, h)
+		if blended.length_squared() > 1e-12:
+			return blended.normalized()
+
+	return n0
 
 func is_body_segment_clear(a: Vector3,b: Vector3,radius: float) -> bool:
 	var bounds := AABB(a.min(b),(b-a).abs()).grow(radius)

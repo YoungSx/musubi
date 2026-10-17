@@ -77,7 +77,9 @@ func _step_surface(delta: float, intent: Vector3) -> void:
 	for i in strides:
 		var direction := tangent(heading, up)
 		if direction == Vector3.ZERO:
-			return
+			direction = tangent(intent, up)
+			if direction == Vector3.ZERO:
+				return
 		_snap(position + direction * (travel / float(strides)))
 		if contact == Contact.AIR:
 			# Walked off a ledge with forward momentum rather than stopping dead.
@@ -146,7 +148,7 @@ func _normal(point: Vector3) -> Vector3:
 	var weight := _body_weight(point)
 	if weight <= 0.0:
 		return Vector3.UP
-	var body := _collision.get_body_normal(point)
+	var body := _collision.get_body_normal(point, _config.body_radius * 1.5)
 	if body == Vector3.ZERO:
 		return Vector3.UP if _collision.floor_enabled else Vector3.ZERO
 	if weight >= 1.0 or not _collision.floor_enabled:

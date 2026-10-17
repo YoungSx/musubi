@@ -50,6 +50,58 @@ func get_visual_root() -> Node3D:
 	return _visual_root
 
 
+## Computes combined AABB of all visual meshes in local space of this mannequin.
+func get_visual_aabb() -> AABB:
+	var total_aabb := AABB()
+	var has_aabb := false
+	if _visual_root != null:
+		var inv_t := global_transform.affine_inverse()
+		for child in _visual_root.find_children("*", "MeshInstance3D", true, false):
+			var mi := child as MeshInstance3D
+			if mi.mesh != null:
+				var mesh_aabb := mi.mesh.get_aabb()
+				var local_mesh_aabb := (inv_t * mi.global_transform) * mesh_aabb
+				if not has_aabb:
+					total_aabb = local_mesh_aabb
+					has_aabb = true
+				else:
+					total_aabb = total_aabb.merge(local_mesh_aabb)
+	return total_aabb
+
+
+## Computes combined AABB of all collision shapes in local space of this mannequin.
+func get_collision_aabb() -> AABB:
+	var total_aabb := AABB()
+	var has_aabb := false
+	if _body != null:
+		var inv_t := global_transform.affine_inverse()
+		for child in _body.find_children("*", "CollisionShape3D", true, false):
+			var cs := child as CollisionShape3D
+			if cs.shape != null:
+				var shape_aabb := _get_shape_aabb(cs.shape)
+				var local_shape_aabb := (inv_t * cs.global_transform) * shape_aabb
+				if not has_aabb:
+					total_aabb = local_shape_aabb
+					has_aabb = true
+				else:
+					total_aabb = total_aabb.merge(local_shape_aabb)
+	return total_aabb
+
+
+static func _get_shape_aabb(shape: Shape3D) -> AABB:
+	if shape is BoxShape3D:
+		var size := (shape as BoxShape3D).size
+		return AABB(-size * 0.5, size)
+	elif shape is SphereShape3D:
+		var r := (shape as SphereShape3D).radius
+		return AABB(Vector3(-r, -r, -r), Vector3(r, r, r) * 2.0)
+	elif shape is CapsuleShape3D:
+		var r := (shape as CapsuleShape3D).radius
+		var h := (shape as CapsuleShape3D).height
+		return AABB(Vector3(-r, -h * 0.5, -r), Vector3(r * 2.0, h, r * 2.0))
+	return AABB()
+
+
 func _request_rebuild() -> void:
 	if not is_node_ready() or _rebuild_pending:
 		return
