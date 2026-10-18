@@ -124,3 +124,22 @@ func test_editor_configuration_warnings_and_mismatch_metrics() -> void:
 	assert_true(not bad_mismatch["is_aligned"], "detects 10x scaled visual as mismatched")
 	var bad_warnings := mannequin._get_configuration_warnings()
 	assert_true(bad_warnings.size() > 0, "warns when visual bounds diverge from collision")
+
+
+func test_automated_collision_fitting_from_visual_scene() -> void:
+	var mannequin := MannequinScene.instantiate() as Mannequin
+	mannequin.visual_scene = load("res://assets/models/marble_bust_01/marble_bust_01_2k.gltf") as PackedScene
+	mannequin.visual_scale = Vector3(3.3786, 3.3786, 3.3786)
+	mannequin.config = null
+	mannequin.auto_fit = true
+	add_to_tree(mannequin)
+
+	assert_true(mannequin.config != null, "auto_fit generates a config from visual_scene")
+	assert_true(mannequin.config.parts.size() >= 5, "generates structured anatomical parts")
+	for p in mannequin.config.parts:
+		assert_true(p.is_valid(), "every generated part satisfies geometric validity")
+
+	var mismatch := mannequin.get_visual_collision_mismatch()
+	assert_true(mismatch["is_aligned"], "auto-fitted collision is geometrically aligned with visual mesh")
+	assert_true(mismatch["height_diff"] < 0.15, "height diff within 0.15m")
+	assert_true(mismatch["center_diff"] < 0.15, "center diff within 0.15m")
