@@ -7,6 +7,8 @@ extends Node3D
 ## When visual_scene is provided, it instantiates the high-detail model (e.g. classical bust).
 ## Otherwise, visuals are generated from config.parts so visuals and collision match.
 
+const MannequinAutofitScript = preload("res://scripts/mannequin/mannequin_autofit.gd")
+
 @export var config: MannequinConfig:
 	set(value):
 		config = value
@@ -22,6 +24,10 @@ extends Node3D
 @export var visual_scale: Vector3 = Vector3.ONE:
 	set(value):
 		visual_scale = value
+		_request_rebuild()
+@export var auto_fit: bool = false:
+	set(value):
+		auto_fit = value
 		_request_rebuild()
 @export_flags_3d_physics var collision_layer: int = 1
 
@@ -145,16 +151,35 @@ func _request_rebuild() -> void:
 	_rebuild.call_deferred()
 
 
+## Automatically generates a MannequinConfig fitted to the current visual_scene.
+func fit_to_visual() -> MannequinConfig:
+	if visual_scene == null:
+		return null
+	var temp_instance := visual_scene.instantiate() as Node3D
+	temp_instance.scale = visual_scale
+	var generated: MannequinConfig = MannequinAutofitScript.fit_from_node(temp_instance)
+	temp_instance.queue_free()
+	return generated
+
+
 func _rebuild() -> void:
 	_rebuild_pending = false
 	_free_generated()
-	if config == null:
-		update_configuration_warnings()
-		return
 
 	_visual_root = Node3D.new()
 	_visual_root.name = "Visuals"
 	add_child(_visual_root)
+
+	if visual_scene != null:
+		_add_custom_visual()
+		if auto_fit and _visual_root != null:
+			var fitted: MannequinConfig = MannequinAutofitScript.fit_from_node(_visual_root)
+			if fitted != null:
+				config = fitted
+
+	if config == null:
+		update_configuration_warnings()
+		return
 
 	_body = StaticBody3D.new()
 	_body.name = "Collision"
@@ -167,9 +192,6 @@ func _rebuild() -> void:
 			push_warning("Mannequin: skipping invalid part '%s'." % (part.part_name if part else &"<null>"))
 			continue
 		_add_part(part)
-
-	if visual_scene != null:
-		_add_custom_visual()
 
 	update_configuration_warnings()
 
