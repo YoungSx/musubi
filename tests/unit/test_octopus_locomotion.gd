@@ -107,3 +107,25 @@ func test_idle_breathing_is_smooth_and_subtle() -> void:
 	assert_true(min_sy > 0.94 and max_sy < 1.06, "idle breathing is subtle (<6% scale change)")
 
 	mascot.free()
+
+
+func test_landing_impact_triggers_squash_and_recovers() -> void:
+	var locomotion = OctopusLocomotion.new()
+	var mascot := Node3D.new()
+	var base_transform := Transform3D(Basis.IDENTITY.scaled(Vector3(0.00018, 0.00018, 0.00018)), Vector3(0, -0.0015, 0))
+	mascot.transform = base_transform
+
+	locomotion.trigger_landing_impact(0.18)
+	locomotion.step(1.0 / 60.0, 0.0, mascot, base_transform)
+	var s_squashed := mascot.transform.basis.get_scale()
+	var rel_y := s_squashed.y / 0.00018
+	assert_true(rel_y < 0.9, "landing impact visibly squashes the mascot body: got %.2f" % rel_y)
+
+	# After recovering for 1 second, impact should decay
+	for i in 60:
+		locomotion.step(1.0 / 60.0, 0.0, mascot, base_transform)
+	var s_recovered := mascot.transform.basis.get_scale()
+	var rel_y_recovered := s_recovered.y / 0.00018
+	assert_near(rel_y_recovered, 1.0, "landing impact fully decays over time", 0.06)
+
+	mascot.free()

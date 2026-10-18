@@ -17,6 +17,22 @@ extends Resource
 @export_range(90.0, 1440.0, 1.0, "suffix:deg/s") var turn_speed_degrees: float = 540.0
 @export var gravity: Vector3 = Vector3(0.0, -9.8, 0.0)
 
+@export_group("Jump")
+## Upward impulse speed along the surface normal when jumping.
+@export_range(0.5, 6.0, 0.1, "suffix:m/s") var jump_speed: float = 2.2
+## Duration in seconds to suppress surface snapping after jumping.
+@export_range(0.05, 0.5, 0.01, "suffix:s") var jump_detach_time: float = 0.18
+## Horizontal velocity multiplier derived from move intent when jumping.
+@export_range(0.0, 2.0, 0.1) var jump_horizontal_boost: float = 0.8
+## Upward bias mixed into the launch direction (useful for wall/curved jumps).
+@export_range(0.0, 1.0, 0.05) var jump_upward_bias: float = 0.4
+## Air control factor: allows player intent to steer horizontal velocity while airborne.
+@export_range(0.0, 1.0, 0.05) var air_control: float = 0.35
+## Grace period in seconds to jump after walking off an edge.
+@export_range(0.0, 0.3, 0.01, "suffix:s") var coyote_time: float = 0.12
+## Window in seconds to buffer jump input before landing.
+@export_range(0.0, 0.3, 0.01, "suffix:s") var jump_buffer_time: float = 0.15
+
 @export_group("Arms")
 @export_range(3, 12, 1) var arm_count: int = 8
 ## Beads per arm. All arms share one MultiMesh, so this costs instances rather
@@ -50,6 +66,8 @@ extends Resource
 ## yield; an arm clamped onto the rope should not. Kept nonzero so the hold
 ## still reads as tissue under load rather than a weld.
 @export_range(0.000001, 0.001, 0.000001) var carry_compliance: float = 0.00002
+## Speed multiplier applied to movement while holding/pulling rope.
+@export_range(0.5, 1.0, 0.05) var carry_drag_factor: float = 0.85
 
 @export_group("Camera")
 ## Height of the camera focus above the body along its local up axis.

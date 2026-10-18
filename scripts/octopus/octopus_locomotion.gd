@@ -3,7 +3,7 @@ extends RefCounted
 ## Procedural locomotion animation for the octopus mascot model.
 ##
 ## Implements squash & stretch, vertical bobbing, crawl-stride waddle,
-## motion tilt/pitch, and idle organic breathing cycles.
+## motion tilt/pitch, landing impact compression, and idle organic breathing cycles.
 
 var stride_length: float = 0.16
 var squash_amount: float = 0.14
@@ -16,11 +16,20 @@ var idle_breathe_amount: float = 0.035
 var _walk_phase: float = 0.0
 var _idle_time: float = 0.0
 var _move_weight: float = 0.0
+var landing_impact: float = 0.0
 
 
-func step(delta: float, speed: float, mascot: Node3D, base_transform: Transform3D) -> void:
+func trigger_landing_impact(intensity: float = 0.18) -> void:
+	landing_impact = intensity
+
+
+func step(delta: float, speed: float, mascot: Node3D, base_transform: Transform3D, vertical_velocity: float = 0.0, is_airborne: bool = false) -> void:
 	if delta <= 0.0 or mascot == null:
 		return
+
+	# Smoothly decay landing impact
+	if landing_impact > 0.0:
+		landing_impact = move_toward(landing_impact, 0.0, 1.2 * delta)
 
 	var is_moving := speed > 0.01
 	if is_moving:
@@ -34,7 +43,10 @@ func step(delta: float, speed: float, mascot: Node3D, base_transform: Transform3
 	# Squash & stretch (volume-preserving)
 	var crawl_squash := -sin(_walk_phase) * squash_amount * _move_weight
 	var breathe_squash := sin(_idle_time * idle_breathe_freq) * idle_breathe_amount * (1.0 - _move_weight)
-	var total_squash := crawl_squash + breathe_squash
+	var air_squash := 0.0
+	if is_airborne:
+		air_squash = -clampf(vertical_velocity * 0.04, -0.15, 0.15)
+	var total_squash := crawl_squash + breathe_squash + air_squash + landing_impact
 	var sy := clampf(1.0 - total_squash, 0.75, 1.35)
 	var sxz := sqrt(1.0 / sy)
 
@@ -70,3 +82,4 @@ func reset() -> void:
 	_walk_phase = 0.0
 	_idle_time = 0.0
 	_move_weight = 0.0
+	landing_impact = 0.0

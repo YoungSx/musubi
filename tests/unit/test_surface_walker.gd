@@ -184,6 +184,76 @@ func test_basis_lies_flat_on_the_surface() -> void:
 	assert_near(basis.determinant(), 1.0, "frame is right-handed and unscaled", 0.001)
 
 
+func test_jump_detaches_from_surface_and_lands_safely() -> void:
+	var walker := _walker(_collision(_sphere(), true))
+	walker.place(Vector3(0.0, 0.03, 0.5))
+	assert_true(walker.contact == SurfaceWalker.Contact.FLOOR, "starts placed on floor")
+	assert_true(walker.jump(), "jump starts when attached to surface")
+	assert_true(walker.contact == SurfaceWalker.Contact.AIR, "jump immediately detaches")
+	assert_true(walker.velocity.y > 0.0, "jump gives upward velocity")
+
+	var max_y := walker.position.y
+	for i in 60:
+		walker.step(1.0 / 60.0, Vector3.ZERO)
+		max_y = maxf(max_y, walker.position.y)
+
+	assert_true(max_y > 0.15, "jump achieved significant height off the floor")
+	assert_true(walker.contact == SurfaceWalker.Contact.FLOOR, "walker landed back on the floor")
+	assert_near(walker.position.y, 0.03, "settled back to floor clearance radius")
+	assert_vec3_near(walker.velocity, Vector3.ZERO, "velocity zeroed after landing")
+
+
+func test_jump_with_horizontal_intent_carries_momentum() -> void:
+	var walker := _walker(_collision(_sphere(), true))
+	walker.place(Vector3(0.0, 0.03, 0.5))
+	var start_z := walker.position.z
+	assert_true(walker.jump(Vector3.BACK), "jump with backward intent")
+	assert_true(walker.velocity.z > 0.0, "velocity carries horizontal momentum")
+	for i in 60:
+		walker.step(1.0 / 60.0, Vector3.ZERO)
+	assert_true(walker.position.z > start_z + 0.05, "walker jumped backward horizontally")
+	assert_true(walker.contact == SurfaceWalker.Contact.FLOOR, "landed safely")
+
+
+func test_jump_refused_when_airborne() -> void:
+	var walker := _walker(_collision(_sphere(), true))
+	walker.place(Vector3(0.0, 0.03, 0.5))
+	assert_true(walker.jump(), "initial jump succeeds")
+	assert_true(not walker.jump(), "cannot jump again while airborne")
+
+
+func test_coyote_time_allows_jump_briefly_after_leaving_surface() -> void:
+	var walker := _walker(_collision(_sphere(), true))
+	walker.place(Vector3(0.0, 0.03, 0.5))
+	assert_true(walker.is_attached(), "starts on floor")
+	# Detach into air
+	walker.position = Vector3(0.0, 0.5, 0.5)
+	walker.contact = SurfaceWalker.Contact.AIR
+	# Advance 2 frames (0.033s), well within coyote_time = 0.12s
+	walker.step(1.0 / 60.0, Vector3.ZERO)
+	walker.step(1.0 / 60.0, Vector3.ZERO)
+	assert_true(walker.jump(), "coyote time permits jumping shortly after falling off surface")
+	assert_true(not walker.jump(), "coyote jump consumed, cannot double jump")
+
+
+func test_air_control_steers_horizontal_velocity() -> void:
+	var walker := _walker(_collision(_sphere(), true))
+	walker.place(Vector3(0.0, 0.03, 0.5))
+	assert_true(walker.jump(), "initiates vertical jump")
+	for i in 5:
+		walker.step(1.0 / 60.0, Vector3.RIGHT)
+	assert_true(walker.velocity.x > 0.01, "air control accelerates horizontal velocity toward intent")
+
+
+func test_wall_jump_carries_upward_bias() -> void:
+	var walker := _walker(_collision(_sphere(), false))
+	walker.place(Vector3(0.35, 0.0, 0.0))
+	assert_vec3_near(walker.up, Vector3.RIGHT, "attached on vertical face")
+	assert_true(walker.jump(), "jump off vertical wall")
+	assert_true(walker.velocity.y > 0.3, "wall jump produces upward climb arc via jump_upward_bias")
+	assert_true(walker.velocity.x > 0.5, "and carries normal outward push")
+
+
 func _walker(collision: RopeCollision) -> SurfaceWalker:
 	var walker := SurfaceWalker.new()
 	walker.configure(_config(), collision)
@@ -195,6 +265,14 @@ func _config() -> OctopusConfig:
 	config.body_radius = 0.03
 	config.cling_range = 0.045
 	config.move_speed = 0.55
+	config.jump_speed = 2.2
+	config.jump_detach_time = 0.18
+	config.jump_horizontal_boost = 0.8
+	config.jump_upward_bias = 0.4
+	config.air_control = 0.35
+	config.coyote_time = 0.12
+	config.jump_buffer_time = 0.15
+	config.carry_drag_factor = 0.85
 	return config
 
 
