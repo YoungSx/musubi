@@ -7,45 +7,68 @@
 script = ExtResource("2_part")
 part_name = &"plinth"
 primitive = 2
-box_size = Vector3(0.65, 0.22, 0.65)
-position = Vector3(0, 0.11, 0)
+box_size = Vector3(0.65, 0.16, 0.65)
+position = Vector3(0.004, 0.08, -0.004)
+
+[sub_resource type="Resource" id="Resource_pedestal_waist"]
+script = ExtResource("2_part")
+part_name = &"pedestal_waist"
+radius = 0.2
+height = 0.4
+position = Vector3(-0.01, 0.23, 0.02)
 
 [sub_resource type="Resource" id="Resource_torso"]
 script = ExtResource("2_part")
 part_name = &"torso"
-radius = 0.28
-height = 0.76
-position = Vector3(0, 0.48, 0.02)
-
-[sub_resource type="Resource" id="Resource_chest"]
-script = ExtResource("2_part")
-part_name = &"chest"
-radius = 0.28
+radius = 0.32
 height = 0.68
-position = Vector3(0, 0.76, 0.04)
+position = Vector3(0.04, 0.48, -0.04)
+
+[sub_resource type="Resource" id="Resource_torso_back"]
+script = ExtResource("2_part")
+part_name = &"torso_back"
+radius = 0.28
+height = 0.6
+position = Vector3(-0.02, 0.55, -0.2)
 
 [sub_resource type="Resource" id="Resource_shoulders"]
 script = ExtResource("2_part")
 part_name = &"shoulders"
-radius = 0.24
-height = 0.84
-position = Vector3(0, 1.02, 0.04)
+radius = 0.26
+height = 0.86
+position = Vector3(0.08, 0.74, -0.02)
 rotation_degrees = Vector3(0, 0, 90)
+
+[sub_resource type="Resource" id="Resource_chest"]
+script = ExtResource("2_part")
+part_name = &"chest"
+radius = 0.26
+height = 0.52
+position = Vector3(0.05, 0.74, 0.18)
 
 [sub_resource type="Resource" id="Resource_neck"]
 script = ExtResource("2_part")
 part_name = &"neck"
-radius = 0.15
-height = 0.34
-position = Vector3(0, 1.25, 0.06)
+radius = 0.2
+height = 0.4
+position = Vector3(-0.03, 1.08, 0.12)
 
-[sub_resource type="Resource" id="Resource_head"]
+[sub_resource type="Resource" id="Resource_head_skull"]
 script = ExtResource("2_part")
-part_name = &"head"
-primitive = 0
+part_name = &"head_skull"
+radius = 0.3
+height = 0.6
+position = Vector3(-0.05, 1.45, 0.05)
+rotation_degrees = Vector3(5, 0, 0)
+
+[sub_resource type="Resource" id="Resource_head_face"]
+script = ExtResource("2_part")
+part_name = &"head_face"
 radius = 0.24
-position = Vector3(0, 1.48, 0.1)
+height = 0.48
+position = Vector3(-0.06, 1.28, 0.26)
+rotation_degrees = Vector3(15, 0, 0)
 
 [resource]
 script = ExtResource("1_config")
-parts = Array[ExtResource("2_part")]([SubResource("Resource_plinth"), SubResource("Resource_torso"), SubResource("Resource_chest"), SubResource("Resource_shoulders"), SubResource("Resource_neck"), SubResource("Resource_head")])
+parts = Array[ExtResource("2_part")]([SubResource("Resource_plinth"), SubResource("Resource_pedestal_waist"), SubResource("Resource_torso"), SubResource("Resource_torso_back"), SubResource("Resource_shoulders"), SubResource("Resource_chest"), SubResource("Resource_neck"), SubResource("Resource_head_skull"), SubResource("Resource_head_face")])
