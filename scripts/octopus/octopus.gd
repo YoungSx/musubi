@@ -45,16 +45,41 @@ func attach_to_world() -> void:
 
 
 func advance(delta: float, intent: Vector3) -> void:
-	var speed := intent.length() * config.move_speed
-	_walker.step(delta, intent)
+	if delta <= 0.0:
+		return
+	var was_attached := _walker.is_attached()
+	var effective_intent := intent
+	if _grab.is_active() and "carry_drag_factor" in config:
+		effective_intent *= config.carry_drag_factor
+	var speed := effective_intent.length() * config.move_speed
+	_walker.step(delta, effective_intent)
 	_apply_transform(delta)
+
+	var is_now_attached := _walker.is_attached()
+	if not was_attached and is_now_attached:
+		_locomotion.trigger_landing_impact(0.18)
+
 	if mascot != null:
-		_locomotion.step(delta, speed, mascot, _base_mascot_transform)
+		var vert_vel := _walker.velocity.y if not is_now_attached else 0.0
+		_locomotion.step(delta, speed, mascot, _base_mascot_transform, vert_vel, not is_now_attached)
 	if _grab.is_active():
 		_grab.carry(get_carry_point(), delta)
 		_arm.hold(get_shoulder(_grab.get_position()), _grab.get_position(), _grab.is_drawn_in())
 	_arm.step(delta)
 	_update_skin()
+
+
+## Jumps off the surface along its normal, with optional horizontal intent.
+func jump(horizontal_intent := Vector3.ZERO) -> bool:
+	return _walker.jump(horizontal_intent)
+
+
+func is_attached() -> bool:
+	return _walker.is_attached()
+
+
+func get_locomotion() -> OctopusLocomotion:
+	return _locomotion
 
 
 ## Grabs rope along an aim direction. A zero direction takes the nearest visible

@@ -155,6 +155,51 @@ func test_material_position_samples_the_same_point_a_grip_would_take() -> void:
 	assert_vec3_near(simulation.get_material_position(-0.1), Vector3.ZERO, "an out-of-range coordinate samples nowhere")
 
 
+func test_cancelled_aim_drag_does_not_jump() -> void:
+	var mode := _mode()
+	var octopus: Octopus = mode.octopus
+	assert_true(octopus.is_attached(), "octopus starts on surface")
+
+	# Simulate dragging aim stick out
+	_push_aim(Vector2(0.0, -1.0))
+	mode._update_aim()
+	assert_true(mode._aim_dragged, "aim stick drag is tracked")
+
+	# Return to centre before release (cancelling aim)
+	_release_aim()
+	mode._update_aim()
+	mode._on_centre_released()
+
+	assert_true(octopus.is_attached(), "cancelled drag does not trigger jump")
+	assert_true(not mode._aim_dragged, "drag state is cleared after cancel")
+
+
+func test_airborne_jump_buffers_and_triggers_upon_landing() -> void:
+	var mode := _mode()
+	var octopus: Octopus = mode.octopus
+	# First jump into air
+	mode._jump()
+	assert_eq(octopus.get_contact(), SurfaceWalker.Contact.AIR, "airborne after first jump")
+
+	# Advance into mid-air descent
+	for i in 20:
+		mode._process(1.0 / 60.0)
+	assert_eq(octopus.get_contact(), SurfaceWalker.Contact.AIR, "still airborne during descent")
+
+	# Buffer a jump shortly before landing (within 0.15s window)
+	mode._jump()
+	assert_true(mode._jump_buffer_timer > 0.0, "jump is buffered while airborne")
+
+	# Process remaining frames until touchdown; buffered jump should trigger re-launch
+	var triggered := false
+	for i in 30:
+		mode._process(1.0 / 60.0)
+		if mode._jump_buffer_timer == 0.0 and octopus.get_contact() == SurfaceWalker.Contact.AIR:
+			triggered = true
+			break
+	assert_true(triggered, "buffered jump triggered immediately upon touchdown")
+
+
 func _controls() -> OctopusControls:
 	return add_to_tree(load("res://scenes/ui/octopus_controls.tscn").instantiate()) as OctopusControls
 

@@ -18,6 +18,8 @@ var _collision := RopeCollision.new()
 ## Whether the aim currently has material in reach. Owned here rather than read
 ## back out of the indicator, which presents this state and does not define it.
 var _aim_locked := false
+var _aim_dragged := false
+var _jump_buffer_timer := 0.0
 
 
 func _ready() -> void:
@@ -28,13 +30,46 @@ func _ready() -> void:
 	_camera.configure(octopus.config, camera_rig, _collision)
 	if controls != null:
 		controls.grab_requested.connect(_grab)
-		controls.release_requested.connect(octopus.release)
+		controls.release_requested.connect(_on_centre_released)
+		if controls.has_signal(&"jump_requested"):
+			controls.jump_requested.connect(_jump)
 	_update_hint()
 
 
+func _jump() -> void:
+	if octopus == null:
+		return
+	if octopus.is_attached():
+		var move_input := OctopusControls.read_move()
+		var intent := SurfaceWalker.camera_intent(move_input, camera_rig.get_target_yaw() if camera_rig != null else 0.0, octopus.get_up())
+		octopus.jump(intent)
+	else:
+		var buffer_limit: float = octopus.config.jump_buffer_time if octopus != null and octopus.config != null else 0.15
+		_jump_buffer_timer = buffer_limit
+
+
+func _on_centre_released() -> void:
+	if _aim_dragged:
+		_aim_dragged = false
+		return
+	if octopus != null and octopus.is_holding():
+		octopus.release()
+		_update_hint()
+	elif octopus != null and octopus.is_attached():
+		_jump()
+
+
 func _process(delta: float) -> void:
+	if _jump_buffer_timer > 0.0:
+		_jump_buffer_timer = maxf(0.0, _jump_buffer_timer - delta)
+
 	var intent := SurfaceWalker.camera_intent(OctopusControls.read_move(), camera_rig.get_target_yaw(), octopus.get_up())
 	octopus.advance(delta, intent)
+
+	if octopus.is_attached() and _jump_buffer_timer > 0.0:
+		_jump_buffer_timer = 0.0
+		_jump()
+
 	_camera.update(delta, octopus.get_position_in_world(), octopus.get_up(), intent)
 	_update_aim()
 	_update_hint()
@@ -55,6 +90,7 @@ static func aim_direction(stick: Vector2, view: Basis) -> Vector3:
 
 
 func _grab(aim: Vector2) -> void:
+	_aim_dragged = false
 	if octopus.is_holding():
 		octopus.release()
 		return
@@ -78,6 +114,8 @@ func _update_aim() -> void:
 	if controls == null:
 		return
 	var stick := OctopusControls.read_aim()
+	if stick.length() > 0.15:
+		_aim_dragged = true
 	var camera := camera_rig.get_camera()
 	# Nothing to preview while holding: a push of this stick releases whatever is
 	# held, whichever way it points, so a target would promise a grab that is not

@@ -23,6 +23,8 @@ var velocity := Vector3.ZERO
 
 var _config: OctopusConfig
 var _collision: RopeCollision
+var _detach_time := 0.0
+var _coyote_timer := 0.0
 
 
 func configure(config: OctopusConfig, collision: RopeCollision) -> void:
@@ -34,13 +36,35 @@ func configure(config: OctopusConfig, collision: RopeCollision) -> void:
 ## body airborne when nothing is in range.
 func place(point: Vector3, heading := Vector3.FORWARD) -> void:
 	velocity = Vector3.ZERO
+	_detach_time = 0.0
 	position = point
 	_snap(point)
 	facing = tangent(heading, up)
+	_coyote_timer = (_config.coyote_time if "coyote_time" in _config else 0.12) if is_attached() else 0.0
 
 
 func is_attached() -> bool:
 	return contact != Contact.AIR
+
+
+## Jumps off the surface along the surface normal (blended with world UP for
+## climbable/sloped surfaces), combined with any horizontal movement intent.
+## Allows jumping during coyote time after walking off an edge.
+func jump(horizontal_intent := Vector3.ZERO) -> bool:
+	var can_jump := is_attached() or _coyote_timer > 0.0
+	if not can_jump or _config == null:
+		return false
+	_coyote_timer = 0.0
+	var upward_bias: float = _config.jump_upward_bias if "jump_upward_bias" in _config else 0.4
+	var launch_dir := (up + Vector3.UP * upward_bias).normalized()
+	var jump_impulse := launch_dir * _config.jump_speed
+	var horiz := tangent(horizontal_intent, up)
+	if horiz.length_squared() > 1e-6:
+		jump_impulse += horiz.normalized() * (_config.move_speed * _config.jump_horizontal_boost)
+	velocity = jump_impulse
+	contact = Contact.AIR
+	_detach_time = _config.jump_detach_time
+	return true
 
 
 ## Local frame for the skin: -Z along the facing tangent, +Y along the surface
@@ -59,7 +83,7 @@ func step(delta: float, intent: Vector3) -> void:
 	if delta <= 0.0 or _collision == null or _config == null:
 		return
 	if contact == Contact.AIR:
-		_step_air(delta)
+		_step_air(delta, intent)
 	else:
 		_step_surface(delta, intent)
 	_turn(delta, intent)
@@ -67,6 +91,7 @@ func step(delta: float, intent: Vector3) -> void:
 
 func _step_surface(delta: float, intent: Vector3) -> void:
 	velocity = Vector3.ZERO
+	_coyote_timer = _config.coyote_time if "coyote_time" in _config else 0.12
 	var strength := clampf(intent.length(), 0.0, 1.0)
 	if strength < 0.0001:
 		return
@@ -77,9 +102,7 @@ func _step_surface(delta: float, intent: Vector3) -> void:
 	for i in strides:
 		var direction := tangent(heading, up)
 		if direction == Vector3.ZERO:
-			direction = tangent(intent, up)
-			if direction == Vector3.ZERO:
-				return
+			return
 		_snap(position + direction * (travel / float(strides)))
 		if contact == Contact.AIR:
 			# Walked off a ledge with forward momentum rather than stopping dead.
@@ -88,11 +111,24 @@ func _step_surface(delta: float, intent: Vector3) -> void:
 		heading = direction
 
 
-func _step_air(delta: float) -> void:
+func _step_air(delta: float, intent := Vector3.ZERO) -> void:
+	_coyote_timer = maxf(0.0, _coyote_timer - delta)
 	velocity += _config.gravity * delta
-	_snap(_collision.constrain_motion(position, position + velocity * delta, _config.body_radius))
-	if contact != Contact.AIR:
-		velocity = Vector3.ZERO
+	if intent.length_squared() > 1e-6 and "air_control" in _config and _config.air_control > 0.0:
+		var target_horiz := intent * (_config.move_speed * _config.air_control)
+		var air_steer_rate := clampf(8.0 * delta, 0.0, 1.0)
+		velocity.x = lerpf(velocity.x, target_horiz.x, air_steer_rate)
+		velocity.z = lerpf(velocity.z, target_horiz.z, air_steer_rate)
+	var target_pos := _collision.constrain_motion(position, position + velocity * delta, _config.body_radius)
+	if _detach_time > 0.0:
+		_detach_time -= delta
+		position = target_pos
+		contact = Contact.AIR
+	else:
+		_snap(target_pos)
+		if contact != Contact.AIR:
+			velocity = Vector3.ZERO
+			_coyote_timer = _config.coyote_time if "coyote_time" in _config else 0.12
 
 
 ## Pulls the body onto the surface within reach and adopts its normal as the
@@ -110,7 +146,7 @@ func _snap(point: Vector3) -> void:
 		return
 	var settled := point
 	var normal := Vector3.ZERO
-	for pass_index in 4:
+	for pass_index in 3:
 		normal = _normal(settled)
 		if normal == Vector3.ZERO:
 			break
@@ -140,7 +176,7 @@ func _clearance(point: Vector3) -> float:
 func _body_weight(point: Vector3) -> float:
 	if not _collision.floor_enabled:
 		return 1.0
-	var band := maxf(_config.body_radius * 1.5, 0.001)
+	var band := maxf(_config.body_radius, 0.001)
 	return smoothstep(-band, band, (point.y - _collision.floor_height) - _collision.get_body_clearance(point))
 
 
@@ -148,7 +184,7 @@ func _normal(point: Vector3) -> Vector3:
 	var weight := _body_weight(point)
 	if weight <= 0.0:
 		return Vector3.UP
-	var body := _collision.get_body_normal(point, _config.body_radius * 1.5)
+	var body := _collision.get_body_normal(point)
 	if body == Vector3.ZERO:
 		return Vector3.UP if _collision.floor_enabled else Vector3.ZERO
 	if weight >= 1.0 or not _collision.floor_enabled:
@@ -214,7 +250,7 @@ static func camera_intent(stick: Vector2, yaw: float, surface_up: Vector3) -> Ve
 ## zero when the vector is parallel to it. Shared by the skin and camera so the
 ## surface frame is derived in exactly one place.
 static func tangent(vector: Vector3, normal: Vector3) -> Vector3:
-	var flat := vector.slide(normal)
+	var flat := vector - normal * vector.dot(normal)
 	if flat.length_squared() < 1e-12:
 		return Vector3.ZERO
 	return flat.normalized()

@@ -6,10 +6,11 @@ extends CanvasLayer
 ## Both sticks are the engine's own VirtualJoystick, which presses the input
 ## actions with an analog strength. Both are therefore read with
 ## Input.get_vector() and need no touch bookkeeping here; the aim stick's
-## release carries the grab and let-go intents.
+## release carries the grab, jump and let-go intents.
 
 signal grab_requested(aim: Vector2)
 signal release_requested
+signal jump_requested
 
 ## Seconds a notice holds the hint line before the steady text returns. Long
 ## enough to read a few words after a gesture, short enough that it never
@@ -98,10 +99,11 @@ func get_aim_indicator() -> AimIndicator:
 
 
 ## One release answers both gestures: outside the deadzone the stick was pointed
-## somewhere, which is a grab; at the centre it was not, which is a let-go.
+## somewhere, which is a grab; at the centre it was not, which is a jump or let-go.
 func _aim_released(stick: Vector2) -> void:
 	if stick.is_zero_approx():
 		release_requested.emit()
+		jump_requested.emit()
 	else:
 		grab_requested.emit(stick)
 
